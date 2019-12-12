@@ -9,7 +9,7 @@ Below are some instructions for retrieving the sample data. We can generate more
 ### Retrieving Sample Data
 Download the sample simulation data file (~700 MB) from the server
 ```bash
-wget island.me.berkeley.edu/spres/rb2d_ra1e6_s42.npz
+wget island.me.berkeley.edu/stsres/rb2d_ra1e6_s42.npz
 ```
 Load and parse the data in python
 ```python
