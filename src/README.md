@@ -93,6 +93,50 @@ for eqn_name in eqn_names:
 
 ### Local Implicit Grid Layer
 <img src="../doc/pde_layer_schematic.png" alt="local implicit grid" height="300">
-The local implicit grid layer is a layer that allows querying the latent feature grid at arbitrary locations and returns the forward values at those locations. The forward values are computed by locally querying a neural network and uses multi-linear interpolation on the 2^d queries. The layer is implemented in a dimensionally agnostic manner and works for arbitrary dimensions (e.g., 1-d, 2-d, 3-d, 4-d for space + time). This layer computes the forward pass for the function values at the queried positions. It can be used as a forward method in the `PDELayer` in order to compute the PDE residue losses at the same positions. See complete example below:
 
-TODO(maxjiang): Add a complete example for using local implicit grid layer with the PDE Layer.
+The local implicit grid layer is a layer that allows querying the latent feature grid at arbitrary locations and returns the forward values at those locations. The forward values are computed by locally querying a neural network and uses multi-linear interpolation on the 2^d queries. The layer is implemented in a dimensionally agnostic manner and works for arbitrary dimensions (e.g., 1-d, 2-d, 3-d, 4-d for space + time). This layer computes the forward pass for the function values at the queried positions. It can be used as a forward method in the `PDELayer` in order to compute the PDE residue losses at the same positions. See complete example below. The same example can also be found in the integration test [`local_implicit_grid_integration_test.py`](local_implicit_grid_integration_test.py).
+
+```python
+import numpy as np
+import torch
+from local_implicit_grid import query_local_implicit_grid
+from implicit_net import ImNet
+from pde import PDELayer
+
+
+# setup parameters
+batch_size = 8  # batch size
+grid_res = 16  # grid resolution
+nc = 32  # number of latent channels
+dim_in = 3
+dim_out = 2
+n_filter = 16  # number of filters in neural net
+n_pts = 1024  # number of query points
+
+# setup pde constraints
+in_vars = 'x, y, t'  # matches dim_in
+out_vars = 'u, v'    # matches dim_out
+eqn_strs = ['dif(u, t) - (dif(dif(u, x), x) + dif(dif(u, y), y))',
+            'dif(v, t) - (dif(dif(v, x), x) + dif(dif(v, y), y))']
+eqn_names = ['diffusion_u', 'diffusion_v']
+
+# setup local implicit grid as forward function
+latent_grid = torch.rand(batch_size, grid_res, grid_res, grid_res, nc)
+query_pts = torch.rand(batch_size, n_pts, dim_in)
+model = ImNet(dim=dim_in, in_features=nc, out_features=dim_out, nf=n_filter)
+fwd_fn = lambda query_pts: query_local_implicit_grid(model, latent_grid, query_pts, 0., 1.)
+
+# setup pde layer
+pdel = PDELayer(in_vars=in_vars, out_vars=out_vars)
+for eqn_str, eqn_name in zip(eqn_strs, eqn_names):
+    pdel.add_equation(eqn_str, eqn_name)
+pdel.update_forward_method(fwd_fn)
+val, res = pdel(query_pts)
+
+# it's harder to check values due to the randomness of the neural net. so we test shape
+# instead
+np.testing.assert_allclose(val.shape, [batch_size, n_pts, dim_out])
+for key in res.keys():
+    res_value = res[key]
+    np.testing.assert_allclose(res_value.shape, [batch_size, n_pts, 1])
+```
