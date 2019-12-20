@@ -43,15 +43,3 @@ def query_local_implicit_grid(model, latent_grid, query_pts, xmin, xmax):
     return output
 
 
-class PhysicsLayer(nn.Module):
-    """Physics Layer for querying values and computing PDE residues."""
-
-    def __init__(self, dim, codelen, variables):
-        super().__init__()
-        self.dim = dim
-        self.codelen = codelen
-        self.variables = variables
-
-    def add_equation(self):
-        pass
-        #TODO(maxjiang): add_equation, forward
