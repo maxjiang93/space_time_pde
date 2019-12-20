@@ -26,7 +26,7 @@ def query_local_implicit_grid(model, latent_grid, query_pts, xmin, xmax):
         query_vals: tensor of shape [b, num_pts, o], queried values at query points, where o is the
         number output channels from the model.
     """
-    corner_values, weights, x_relative = rgi.regular_nd_grid_interpolation_coefficents(
+    corner_values, weights, x_relative = rgi.regular_nd_grid_interpolation_coefficients(
         latent_grid, query_pts, xmin, xmax)
     concat_features = torch.cat([x_relative, corner_values], axis=-1)  # [b, num_points, 2**d,  d+c]
     input_shape = concat_features.shape
