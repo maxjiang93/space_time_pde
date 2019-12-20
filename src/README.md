@@ -36,7 +36,7 @@ def fwd_function(X):
  eqn_str_2 = 'dif(v, t) - (dif(dif(v, x), x) + dif(dif(v, y), y))'
  ```
 
-There is no particular rule as to how the equations should be written. The parser is rather flexible, as long as it is a valid expression. The only thing to note is the the derivative operator should be written such as `dif(u, x)` to express ![](https://latex.codecogs.com/svg.latex?\partial&space;u&space;/&space;\partial&space;x).
+There is no particular rule as to how the equations should be written. The parser is rather flexible, as long as it is a valid expression. The only thing to note is that the derivative operator should be written in the form of `dif(u, x)` to express a differential operator ![](https://latex.codecogs.com/svg.latex?\partial&space;u&space;/&space;\partial&space;x).
 
 #### Implementation
 See below for an example of how to setup the PDE layer for the equations above.
