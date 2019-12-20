@@ -7,17 +7,36 @@ This is the code repository for the physical constrained space time super-resolu
 ## Organization
 Here is a rough proposed organization of the code repo. Feel free to add additional folders / files to this list with a logical organization.
 ```bash
-- srcs
-  - unet.py          # unet model and utilities
-  - lig.py           # learnable implicit grid layer
-  - utils.py         # utility functions
-  - pde.py           # pde loss layer
-  - metrics.py       # metrics for evaluating performance
-- experiments
-  - rb2d             # 2d rayleigh-benard experiment
-    - dataloader.py  # pytorch dataloader for loading data
-    - model.py       # model code
-    - train.py       # main code for training the model
+├── doc
+│   ├── pde_constraints.png
+│   └── pde_layer_schematic.png
+├── experiments
+│   └── rb2d
+│       ├── dataloader.py
+│       ├── model.py
+│       ├── README.md
+│       └── train.py
+├── README.md
+├── simulation
+│   └── 2d_rayleigh_benard
+│       ├── convert_to_npz.py
+│       ├── create_video.sh
+│       ├── plot_slices.py
+│       └── rayleigh_benard.py
+└── src
+    ├── implicit_net.py
+    ├── implicit_net_test.py
+    ├── local_implicit_grid_integration_test.py
+    ├── local_implicit_grid.py
+    ├── local_implicit_grid_test.py
+    ├── metrics.py
+    ├── pde.py
+    ├── pde_test.py
+    ├── README.md
+    ├── regular_nd_grid_interpolation.py
+    ├── regular_nd_grid_interpolation_test.py
+    ├── unet.py
+    └── utils.py
 ```
 
 ## TODO
