@@ -25,7 +25,7 @@ Here is a rough proposed organization of the code repo. Feel free to add additio
 - ~~Add migrate LearnableVoxelGrid to lig and add temporal aspects into the framework (@max)~~
 - ~~Implement PDE constraints layer (@max)~~
 - ~~Convert data samples to `.npy` format before 12/10 and hand over to Soheil for testing (@max)~~
-- Add detailed writeup and examples on how to use the PDE layers (@max)
+- ~~Add detailed writeup and examples on how to use the PDE layers (@max)~~
 - Create data loader (@soheil)
 - Create U-Net (@soheil)
 - Test dataloader + U-Net + lig on small data to overfit (@soheil)
