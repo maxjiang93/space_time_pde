@@ -89,3 +89,9 @@ for eqn_name in eqn_names:
     np.testing.assert_allclose(res[eqn_name].detach().numpy(),
                                expected_res[eqn_name].detach().numpy())
 ```
+
+## Local Implicit Grid Layer
+<img src="../doc/pde_layer_schematic.png" alt="local implicit grid" height="300">
+The local implicit grid layer is a layer that allows querying the latent feature grid at arbitrary locations and returns the forward values at those locations. The forward values are computed by locally querying a neural network and uses multi-linear interpolation on the 2^d queries. The layer is implemented in a dimensionally agnostic manner and works for arbitrary dimensions (e.g., 1-d, 2-d, 3-d, 4-d for space + time). This layer computes the forward pass for the function values at the queried positions. It can be used as a forward method in the `PDELayer` in order to compute the PDE residue losses at the same positions. See complete example below:
+
+TODO(maxjiang): Add a complete example for using local implicit grid layer with the PDE Layer.
