@@ -4,7 +4,7 @@ This page will provide some overview and examples for the functions and methods 
 ### Enforcing PDE constraints w/ Backprop
 <img src="../doc/pde_constraints.png" alt="pde constraints schematic" height="300">
 
-We implement a PDE layer for computing the residues of PDEs via backpropagation through the computation graph. For an arbitrary blackbox function ![](https://latex.codecogs.com/svg.latex?&space;y_1,&space;y_2,&space;\cdots,&space;y_m&space;=&space;f(x_1,&space;x_1,&space;\cdots,&space;x_n)) that is implemented via PyTorch, our module allows aribtrary number of any partial differential equations that combines derivatives of any output variable with respect to any input variable. See below for an example.
+We implement a PDE layer for computing the residues of PDEs via backpropagation through the computation graph. For an arbitrary blackbox function ![](https://latex.codecogs.com/svg.latex?&space;y_1,&space;y_2,&space;\cdots,&space;y_m&space;=&space;f(x_1,&space;x_1,&space;\cdots,&space;x_n)) that is implemented via PyTorch, our module allows arbitrary number of any partial differential equations that combines derivatives of any output variable with respect to any input variable. See below for an example.
 
 #### Problem Statement
 Suppose the PDE that we want to enforce is the following:
