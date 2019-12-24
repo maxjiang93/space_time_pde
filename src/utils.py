@@ -11,7 +11,6 @@ def conv33(in_channels, out_channels, stride=1, padding=1, bias=True, groups=1):
 
     return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=padding, bias=bias, groups=groups)
 
-
 def upconv22(in_channels, out_channels, mode='transpose'):
 
     """
@@ -24,7 +23,6 @@ def upconv22(in_channels, out_channels, mode='transpose'):
     else:
         # mode in {'nearest','linear','bilinear','bicubic','trilinear}
         return nn.Sequential(nn.Upsample(mode='bilinear', scale_factor=2), conv11(in_channels, out_channels))
-
 
 def conv11(in_channels, out_channels, groups=1):
 
@@ -101,17 +99,10 @@ class UpConv(nn.Module):
 
         if self.merging_mode == 'concat':
             x = torch.cat((from_decoder, from_encoder), 1)
-            x = F.relu(self.conv1(x))
-            x = F.relu(self.conv2(x))
-
-        elif self.merging_mode == 'final':
-            x = from_decoder
-            x = F.relu(self.conv1(x))
-            x = F.relu(self.conv2(x))
-
         else:
             x = from_decoder + from_encoder
-            x = F.relu(self.conv1(x))
-            x = F.relu(self.conv2(x))
+
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
 
         return x
