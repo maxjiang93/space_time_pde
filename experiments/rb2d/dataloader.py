@@ -72,25 +72,25 @@ class DataSet():
 
 
 
-    def down_res(self, arr, factor=2, kind_="cubic"):
+    def down_res(self, arr, factor, kind):
         
         """
         function for 
          - converting an image represented by "arr" to lower resolution by a factor specified as "factor"
          - using 2d interpolation, where kind_="cubic is chosen as a default interpolation scheme
-         - kind_ in : {‘linear’, ‘cubic’, ‘quintic’}
+         - kind ∈ {‘linear’, ‘cubic’, ‘quintic’}
         """
     
         H, W = arr.shape
         new_H, new_W = (int(H/factor),int(W/factor))
 
-        f = interpolate.interp2d(np.linspace(0, 1, H), np.linspace(0, 1, W), arr, kind=kind_)
+        f = interpolate.interp2d(np.linspace(0, 1, H), np.linspace(0, 1, W), arr, kind=kind)
         new_arr = f(np.linspace(0, 1, new_H),np.linspace(0, 1, new_W))
 
         return new_arr
 
 
-    def createLowResData(self, down_res_factor = 2):
+    def createLowResData(self, down_res_factor=2, kind="cubic"):
         
         """
         function for 
@@ -103,8 +103,8 @@ class DataSet():
                                    self.highResolutionData.shape[3]//down_res_factor))
         for t in range(self.highResolutionData.shape[0]):
             for i in range(8):
-                d_ts01_low_res[t,i,:,:] = down_res(self.highResolutionData[t,i,:,:], 
-                                                   factor=down_res_factor, kind_="linear") 
+                d_ts01_low_res[t,i,:,:] = self.down_res(self.highResolutionData[t,i,:,:],
+                                                   factor=down_res_factor, kind=kind)
 
         self.lowResolutionData = d_ts01_low_res
     
@@ -162,8 +162,9 @@ class DataLoaderDeepRes():
     def __len__(self):
         return len(self.high_res_images)
 
-    
-    
+
+
+
 if __name__ == "__main__":
     
     """
@@ -171,12 +172,16 @@ if __name__ == "__main__":
     high resolution dataset preparation, 
     low resolution image creation and dataset preparation, 
     and creating batches by dataLoader.
+    args: 
+        kind: type of 2d interpolation for creating low-res images, kind ∈ {‘linear’, ‘cubic’, ‘quintic’}
+        down_res_factor (int): the factor by which we want to convert high-res data to low-res in each direction, e.g. 2,4,... 
+        batch_size: is the batch size for the dataset
     """
 
     ### gettting lowRes and higRes data
     dataset = DataSet()
     dataset.getHighResData()
-    dataset.createLowResData()
+    dataset.createLowResData(down_res_factor=2, kind="cubic")
     
     lowResData = dataset.lowResolutionData
     highResData = dataset.highResolutionData
@@ -185,7 +190,7 @@ if __name__ == "__main__":
     
     ### example for using the data loader
     data_loader = DataLoaderDeepRes(dataset.lowResolutionData,dataset.highResolutionData)
-    data_batches = torch.utils.data.DataLoader(data_loader, batch_size=16, shuffle=True, num_workers=1)
+    data_batches = torch.utils.data.DataLoader(data_loader, batch_size=32, shuffle=True, num_workers=1)
 
     for batch_idx, (lowres_input_batch, highres_output_batch) in enumerate(data_batches):
         print("Reading batch #{}:\t with lowres inputs of size {} and highres outputs of size {}"
