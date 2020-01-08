@@ -65,13 +65,12 @@ def train(args, unet, imnet, train_loader, epoch, device, logger, optimizer, pde
     imnet.train()
     tot_loss = 0
     count = 0
-    xmin = [0., 0., 0.]
-    xmax = [1., 1., 1.]
+    xmin = torch.zeros(3, dtype=torch.float32).to(device)
+    xmax = torch.ones(3, dtype=torch.float32).to(device)
     loss_func = loss_functional(args.reg_loss_type)
     for batch_idx, data_tensors in enumerate(train_loader):
         # send tensors to device
-        for tensor in data_tensors:
-            tensor = tensor.to(device)
+        data_tensors = [t.to(device) for t in data_tensors]
         input_grid, point_coord, point_value = data_tensors
         optimizer.zero_grad()
         latent_grid = unet(input_grid)  # [batch, N, C, T, X, Y]

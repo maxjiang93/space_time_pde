@@ -32,8 +32,9 @@ def regular_nd_grid_interpolation_coefficients(grid, query_pts, xmin=0., xmax=1.
     """
 
     # dimension
+    device = grid.device
     dim = len(grid.shape) - 2
-    size = torch.tensor(grid.shape[1:-1])
+    size = torch.tensor(grid.shape[1:-1]).float().to(device)
 
     # convert xmin and xmax
     if isinstance(xmin, (int, float)) or isinstance(xmax, (int, float)):
