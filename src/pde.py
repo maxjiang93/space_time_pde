@@ -113,19 +113,21 @@ class PDELayer(object):
           y: output tensor of shape (..., n_out)
           residues (optional): a dictionary containing residue evaluation for each pde.
         """
-        inputs = [x[..., i:i+1] for i in range(x.shape[-1])]
-        for xx in inputs:
-          xx.requires_grad = True
-        x_ = torch.cat(inputs, axis=-1)
-        y = self.eval(x_)
-        if not return_residue:
-          return y
-        else:
 
-          outputs = [y[..., i] for i in range(y.shape[-1])]
-          inputs_outputs = inputs + outputs
-          residues = {}
-          for key, fn in self.eqns_fn.items():
+        if not return_residue:
+            y = self.eval(x)
+            return y
+        else:
+            # split into individual channels and set each to require grad.
+            inputs = [x[..., i:i+1] for i in range(x.shape[-1])]
+            for xx in inputs:
+              xx.requires_grad = True
+            x_ = torch.cat(inputs, axis=-1)
+            y = self.eval(x_)
+            outputs = [y[..., i:i+1] for i in range(y.shape[-1])]
+            inputs_outputs = inputs + outputs
+            residues = {}
+            for key, fn in self.eqns_fn.items():
               residue = fn(*inputs_outputs)
               residues.update({key: residue})
-          return y, residues
+            return y, residues

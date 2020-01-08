@@ -1,23 +1,25 @@
 """RB2 Experiment Dataloader"""
+import os
 import torch
 from torch.utils.data import Dataset
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
+# pylint: disable=too-many-arguments, too-many-instance-attributes, too-many-locals
 
 
-class RB2DataLoader(Dataset):  # pylint: disable=too-many-instance-attributes
+class RB2DataLoader(Dataset):
     """Pytorch Dataset instance for loading Rayleigh Bernard 2D dataset.
 
     Loads a 2d space + time cubic cutout from the whole simulation.
     """
-    def __init__(self, data_path="./", data_filename="rb2d_ra1e6_s42.npz",  # pylint: disable=too-many-arguments
+    def __init__(self, data_dir="./", data_filename="rb2d_ra1e6_s42.npz",
                  nx=128, ny=128, nt=16, n_samp_pts_per_crop=1024, interp_method='linear',
-                 downsamp_xy=4, downsamp_t=4):
+                 downsamp_xy=4, downsamp_t=4, normalize_output=False):
         """
 
         Initialize DataSet
         Args:
-          data_path: str, path to the dataset folder, default="./"
+          data_dir: str, path to the dataset folder, default="./"
           data_filename: str, name of the dataset file, default="rb2d_ra1e6_s42"
           nx: int, number of 'pixels' in x dimension for high res dataset.
           ny: int, number of 'pixels' in y dimension for high res dataset.
@@ -27,7 +29,7 @@ class RB2DataLoader(Dataset):  # pylint: disable=too-many-instance-attributes
           downsamp_xy: int, downsampling factor for the spatial dimensions.
           downsamp_t: int, downsampling factor for the temporal dimension.
         """
-        self.data_path = data_path
+        self.data_dir = data_dir
         self.data_filename = data_filename
         self.nx_hres = nx
         self.ny_hres = ny
@@ -39,10 +41,11 @@ class RB2DataLoader(Dataset):  # pylint: disable=too-many-instance-attributes
         self.interp_method = interp_method
         self.downsamp_xy = downsamp_xy
         self.downsamp_t = downsamp_t
+        self.normalize_output = normalize_output
 
         # concatenating pressure, temperature, x-velocity, and z-velocity as a 4 channel array: pbuw
         # shape: (4, 200, 512, 128)
-        npdata = np.load(self.data_path + self.data_filename)
+        npdata = np.load(os.path.join(self.data_dir, self.data_filename))
         self.data = np.stack([npdata['p'], npdata['b'], npdata['u'], npdata['w']], axis=0)
         nc_data, nt_data, nx_data, ny_data = self.data.shape
 
@@ -79,7 +82,8 @@ class RB2DataLoader(Dataset):  # pylint: disable=too-many-instance-attributes
           idx: int, index of the crop to return. must be smaller than len(self).
 
         Returns:
-          space_time_crop_lres: array of shape [nt_lres, nx_lres, ny_lres]
+          space_time_crop_lres: array of shape [4, nt_lres, nx_lres, ny_lres], where 4 are the phys
+          channels pbuw.
           point_coord: array of shape [n_samp_pts_per_crop, 3], where 3 are the t, x, y dims.
           point_value: array of shape [n_samp_pts_per_crop, 4], where 4 are the phys channels pbuw.
         """
@@ -98,16 +102,21 @@ class RB2DataLoader(Dataset):  # pylint: disable=too-many-instance-attributes
                                           np.linspace(0, self.nx_hres-1, self.nx_lres),
                                           np.linspace(0, self.ny_hres-1, self.ny_lres),
                                           indexing='ij'), axis=-1)
-        space_time_crop_lres = interp(lres_coord)
+        space_time_crop_lres = interp(lres_coord).transpose(3, 0, 1, 2)
 
         # create random point samples within space time crop
         point_coord = np.random.rand(self.n_samp_pts_per_crop, 3) * (self.scale_hres - 1)
         point_value = interp(point_coord)
-        point_coord = point_coord / (self.scale_hres - 1) * (self.scale_lres - 1)
+        point_coord = point_coord / (self.scale_hres - 1)
 
-        return (space_time_crop_lres.astype(np.float32),
-                point_coord.astype(np.float32),
-                point_value.astype(np.float32))
+        space_time_crop_lres = space_time_crop_lres.astype(np.float32)
+        point_coord = point_coord.astype(np.float32)
+        point_value = point_value.astype(np.float32)
+
+        if self.normalize_output:
+            space_time_crop_lres = self.normalize_grid(space_time_crop_lres)
+            point_value = self.normalize_grid(point_value)
+        return space_time_crop_lres, point_coord, point_value
 
     @property
     def channel_mean(self):
@@ -119,6 +128,81 @@ class RB2DataLoader(Dataset):  # pylint: disable=too-many-instance-attributes
         """channel-wise mean of dataset."""
         return self._std
 
+    @staticmethod
+    def _normalize_array(array, mean, std):
+        """normalize array (np or torch)."""
+        if isinstance(array, torch.Tensor):
+            dev = array.device
+            std = torch.tensor(std, device=dev)
+            mean = torch.tensor(mean, device=dev)
+        return (array - mean) / std
+
+    @staticmethod
+    def _denormalize_array(array, mean, std):
+        """normalize array (np or torch)."""
+        if isinstance(array, torch.Tensor):
+            dev = array.device
+            std = torch.tensor(std, device=dev)
+            mean = torch.tensor(mean, device=dev)
+        return array * std + mean
+
+    def normalize_grid(self, grid):
+        """Normalize grid.
+
+        Args:
+          grid: np array or torch tensor of shape [4, ...], 4 are the num. of phys channels.
+        Returns:
+          channel normalized grid of same shape as input.
+        """
+        # reshape mean and std to be broadcastable.
+        g_dim = len(grid.shape)
+        mean_bc = self.channel_mean[(...,)+(None,)*(g_dim-1)]  # unsqueeze from the back
+        std_bc = self.channel_std[(...,)+(None,)*(g_dim-1)]  # unsqueeze from the back
+        return self._normalize_array(grid, mean_bc, std_bc)
+
+
+    def normalize_points(self, points):
+        """Normalize points.
+
+        Args:
+          points: np array or torch tensor of shape [..., 4], 4 are the num. of phys channels.
+        Returns:
+          channel normalized points of same shape as input.
+        """
+        # reshape mean and std to be broadcastable.
+        g_dim = len(points.shape)
+        mean_bc = self.channel_mean[(None,)*(g_dim-1)]  # unsqueeze from the front
+        std_bc = self.channel_std[(None,)*(g_dim-1)]  # unsqueeze from the front
+        return self._normalize_array(points, mean_bc, std_bc)
+
+    def denormalize_grid(self, grid):
+        """Denormalize grid.
+
+        Args:
+          grid: np array or torch tensor of shape [4, ...], 4 are the num. of phys channels.
+        Returns:
+          channel denormalized grid of same shape as input.
+        """
+        # reshape mean and std to be broadcastable.
+        g_dim = len(grid.shape)
+        mean_bc = self.channel_mean[(...,)+(None,)*(g_dim-1)]  # unsqueeze from the back
+        std_bc = self.channel_std[(...,)+(None,)*(g_dim-1)]  # unsqueeze from the back
+        return self._denormalize_array(grid, mean_bc, std_bc)
+
+
+    def denormalize_points(self, points):
+        """Denormalize points.
+
+        Args:
+          points: np array or torch tensor of shape [..., 4], 4 are the num. of phys channels.
+        Returns:
+          channel denormalized points of same shape as input.
+        """
+        # reshape mean and std to be broadcastable.
+        g_dim = len(points.shape)
+        mean_bc = self.channel_mean[(None,)*(g_dim-1)]  # unsqueeze from the front
+        std_bc = self.channel_std[(None,)*(g_dim-1)]  # unsqueeze from the front
+        return self._denormalize_array(points, mean_bc, std_bc)
 
 
 if __name__ == '__main__':

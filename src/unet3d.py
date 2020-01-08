@@ -56,7 +56,7 @@ class ResBlock3D(nn.Module):
         return x
 
 
-class UNet3D(nn.Module):  # pylint: disable=too-many-instance-attributes
+class UNet3d(nn.Module):  # pylint: disable=too-many-instance-attributes
     """UNet that consumes even dimension grid and outputs odd dimension grid.
     """
 
@@ -74,7 +74,7 @@ class UNet3D(nn.Module):  # pylint: disable=too-many-instance-attributes
           nf: int, number of base feature layers.
           mf: int, a cap for max number of feature layers throughout the network.
         """
-        super(UNet3D, self).__init__()
+        super(UNet3d, self).__init__()
         self.igres = igres
 
         self.nf = nf
@@ -115,8 +115,9 @@ class UNet3D(nn.Module):  # pylint: disable=too-many-instance-attributes
                              '{} and {}'.format(len(self.igres), len(self.ogres)))
         # check powers of 2
         for d in list(self.igres) + list(self.ogres):
-            if not (math.log(d, 2) % 1 == 0 and isinstance(d, int)):
-                raise ValueError('dimensions in igres and ogres must be  integer powers of 2.')
+            if not (math.log(d, 2) % 1 == 0 and np.issubdtype(type(d), np.integer)):
+                raise ValueError('dimensions in igres and ogres must be  integer powers of 2.'
+                                 'instead they are {} and {}.'.format(self.igres, self.ogres))
 
     def _create_layers(self):
         # num. features in downward path
@@ -201,7 +202,7 @@ class UNet3D(nn.Module):  # pylint: disable=too-many-instance-attributes
 
 
 if __name__ == '__main__':
-    unet = UNet3D(out_features=32)
+    unet = UNet3d(out_features=32)
     x_samp = torch.rand(16, 4, 4, 32, 32)  # [batch, in_features, rest, resx, resy]
     y = unet(x_samp)
     print(y.shape)
