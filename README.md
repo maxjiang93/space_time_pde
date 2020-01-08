@@ -47,5 +47,5 @@ Here is a rough proposed organization of the code repo. Feel free to add additio
 - ~~Add detailed writeup and examples on how to use the PDE layers (@max)~~
 - ~~Create data loader (@soheil)~~
 - ~~Create U-Net (@soheil)~~
-- Test dataloader + U-Net + lig on small data to overfit (@soheil)
+- ~~Test dataloader + U-Net + lig on small data to overfit (@max)~~
 - LaTeX writeup (@kamyar)
