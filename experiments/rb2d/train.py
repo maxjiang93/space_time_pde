@@ -71,7 +71,7 @@ def train(args, unet, imnet, train_loader, epoch, device, logger, optimizer, pde
     for batch_idx, data_tensors in enumerate(train_loader):
         # send tensors to device
         for tensor in data_tensors:
-            tensor.to(device)
+            tensor = tensor.to(device)
         input_grid, point_coord, point_value = data_tensors
         optimizer.zero_grad()
         latent_grid = unet(input_grid)  # [batch, N, C, T, X, Y]
