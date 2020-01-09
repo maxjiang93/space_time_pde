@@ -14,7 +14,7 @@ class RB2DataLoader(Dataset):
     """
     def __init__(self, data_dir="./", data_filename="rb2d_ra1e6_s42.npz",
                  nx=128, ny=128, nt=16, n_samp_pts_per_crop=1024, interp_method='linear',
-                 downsamp_xy=4, downsamp_t=4, normalize_output=False):
+                 downsamp_xy=4, downsamp_t=4, normalize_output=False, return_hres=False):
         """
 
         Initialize DataSet
@@ -28,6 +28,8 @@ class RB2DataLoader(Dataset):
           interp_method: str, interpolation method. choice of 'linear/nearest'
           downsamp_xy: int, downsampling factor for the spatial dimensions.
           downsamp_t: int, downsampling factor for the temporal dimension.
+          normalize_output: bool, whether to normalize the range of each channel to [0, 1].
+          return_hres: bool, whether to return the high-resolution data.
         """
         self.data_dir = data_dir
         self.data_filename = data_filename
@@ -42,11 +44,13 @@ class RB2DataLoader(Dataset):
         self.downsamp_xy = downsamp_xy
         self.downsamp_t = downsamp_t
         self.normalize_output = normalize_output
+        self.return_hres = return_hres
 
         # concatenating pressure, temperature, x-velocity, and z-velocity as a 4 channel array: pbuw
         # shape: (4, 200, 512, 128)
         npdata = np.load(os.path.join(self.data_dir, self.data_filename))
         self.data = np.stack([npdata['p'], npdata['b'], npdata['u'], npdata['w']], axis=0)
+        self.data = self.data.astype(np.float32)
         nc_data, nt_data, nx_data, ny_data = self.data.shape
 
         # assert nx, ny, nt are viable
@@ -109,14 +113,14 @@ class RB2DataLoader(Dataset):
         point_value = interp(point_coord)
         point_coord = point_coord / (self.scale_hres - 1)
 
-        space_time_crop_lres = space_time_crop_lres.astype(np.float32)
-        point_coord = point_coord.astype(np.float32)
-        point_value = point_value.astype(np.float32)
-
         if self.normalize_output:
             space_time_crop_lres = self.normalize_grid(space_time_crop_lres)
             point_value = self.normalize_grid(point_value)
-        return space_time_crop_lres, point_coord, point_value
+
+        return_tensors = [space_time_crop_lres, point_coord, point_value]
+        if self.return_hres:
+            return_tensors += [space_time_crop_hres]
+        return tuple(return_tensors)
 
     @property
     def channel_mean(self):
