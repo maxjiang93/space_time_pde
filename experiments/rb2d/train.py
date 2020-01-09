@@ -1,15 +1,17 @@
-import math
+"""Training script for RB2 experiment.
+"""
 import argparse
-import numpy as np
-np.set_printoptions(precision=4)
 import os
 from glob import glob
+import numpy as np
+np.set_printoptions(precision=4)
 
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.tensorboard import SummaryWriter
 
 # import my modules
 import sys
@@ -59,7 +61,8 @@ def loss_functional(loss_type):
     return F.smooth_l1_loss
 
 
-def train(args, unet, imnet, train_loader, epoch, device, logger, optimizer, pde_layer):
+def train(args, unet, imnet, train_loader, epoch, global_step, device,
+          logger, writer, optimizer, pde_layer):
     """Training function."""
     unet.train()
     imnet.train()
@@ -97,12 +100,23 @@ def train(args, unet, imnet, train_loader, epoch, device, logger, optimizer, pde
         tot_loss += loss.item()
         count += input_grid.size()[0]
         if batch_idx % args.log_interval == 0:
+            # logger log
             logger.info(
                 "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss Sum: {:.6f}\t"
                 "Loss Reg: {:.6f}\tLoss Pde: {:.6f}".format(
                     epoch, batch_idx * len(input_grid), len(train_loader.dataset),
                     100. * batch_idx / len(train_loader), loss.item(),
                     args.alpha_reg * reg_loss, args.alpha_pde * pde_loss))
+            # tensorboard log
+            writer.add_scalar('train/reg_loss_unweighted', reg_loss, global_step=int(global_step))
+            writer.add_scalar('train/pde_loss_unweighted', pde_loss, global_step=int(global_step))
+            writer.add_scalar('train/sum_loss', loss, global_step=int(global_step))
+            writer.add_scalars('train/losses_weighted',
+                               {"reg_loss": args.alpha_reg * reg_loss,
+                                "pde_loss": args.alpha_pde * pde_loss,
+                                "sum_loss": loss}, global_step=int(global_step))
+
+        global_step += 1
     tot_loss /= count
     return tot_loss
 
@@ -114,6 +128,8 @@ def main():
                         help="input batch size for training (default: 32)")
     parser.add_argument("--epochs", type=int, default=100, metavar="N",
                         help="number of epochs to train (default: 10)")
+    parser.add_argument("--pseudo_epoch_size", type=int, default=2048, metavar="N",
+                        help="number of samples in an pseudo-epoch. (default: 2048)")
     parser.add_argument("--lr", type=float, default=1e-2, metavar="R",
                         help="learning rate (default: 0.01)")
     parser.add_argument("--no_cuda", action="store_true", default=False,
@@ -152,6 +168,7 @@ def main():
                         help="number of base number of feature layers in implicit network.")
     parser.add_argument("--alpha_reg", default=1., type=float, help="weight of regression loss.")
     parser.add_argument("--alpha_pde", default=1., type=float, help="weight of pde residue loss.")
+    parser.add_argument("--num_log_images", default=8, type=int, help="number of images to log.")
 
 
     args = parser.parse_args()
@@ -165,6 +182,9 @@ def main():
     logger = utils.get_logger(log_dir=args.log_dir)
     logger.info("%s", repr(args))
 
+    # tensorboard writer
+    writer = SummaryWriter(log_dir=os.path.join(args.log_dir, 'tensorboard'))
+
     # random seed for reproducability
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -174,12 +194,22 @@ def main():
         data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
         nx=args.nx, ny=args.ny, nt=args.nt, n_samp_pts_per_crop=args.n_samp_pts_per_crop,
         interp_method='linear', downsamp_xy=args.downsamp_xy, downsamp_t=args.downsamp_t,
-        normalize_output=False)
+        normalize_output=False, return_hres=False)
+    evalset = loader.RB2DataLoader(
+        data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
+        nx=args.nx, ny=args.ny, nt=args.nt, n_samp_pts_per_crop=args.n_samp_pts_per_crop,
+        interp_method='linear', downsamp_xy=args.downsamp_xy, downsamp_t=args.downsamp_t,
+        normalize_output=False, return_hres=True)
 
-    # valset = trainset  # NOTE: for now (overfitting exp.) set valset = trainset
-    train_loader = DataLoader(trainset, batch_size=args.batch_size, shuffle=True, drop_last=True)
-    # val_loader = DataLoader(valset, batch_size=args.batch_size, shuffle=True, drop_last=False)
+    train_sampler = RandomSampler(trainset, replacement=False, num_samples=args.pseudo_epoch_size)
+    eval_sampler = RandomSampler(evalset, replacement=False, num_samples=args.num_log_images)
 
+    train_loader = DataLoader(trainset, batch_size=args.batch_size, shuffle=False, drop_last=True,
+                              sampler=train_sampler)
+    eval_loader = DataLoader(evalset, batch_size=args.batch_size, shuffle=False, drop_last=False,
+                             sampler=eval_sampler)
+
+    # setup model
     unet = UNet3d(in_features=4, out_features=args.lat_dims, igres=trainset.scale_lres,
                   nf=args.unet_nf, mf=args.unet_mf)
     imnet = ImNet(dim=3, in_features=args.lat_dims, out_features=4, nf=args.imnet_nf)
@@ -191,10 +221,13 @@ def main():
         optimizer = optim.Adam(all_model_params, lr=args.lr)
 
     start_ep = 0
-    tracked_stats = 0
+    global_step = np.zeros(1, dtype=np.uint32)
+    tracked_stats = np.inf
+
     if args.resume:
         resume_dict = torch.load(args.resume)
         start_ep = resume_dict["epoch"]
+        global_step = resume_dict["global_step"]
         tracked_stats = resume_dict["tracked_stats"]
         unet.load(resume_dict["unet_state_dict"])
         imnet.load(resume_dict["imnet_state_dict"])
@@ -216,7 +249,7 @@ def main():
 
     # training loop
     for epoch in range(start_ep + 1, args.epochs + 1):
-        loss = train(args, unet, imnet, train_loader, epoch, device, logger, optimizer, pde_layer)
+        loss = train(args, unet, imnet, train_loader, epoch, global_step, device, logger, writer, optimizer, pde_layer)
         if loss < tracked_stats:
             tracked_stats = loss
             is_best = True
@@ -225,10 +258,11 @@ def main():
 
         utils.save_checkpoint({
             "epoch": epoch,
-            "unet_state_dict": unet.state_dict(),
-            "imnet_state_dict": imnet.state_dict(),
+            "unet_state_dict": unet.modules.state_dict(),
+            "imnet_state_dict": imnet.modules.state_dict(),
             "optim_state_dict": optimizer.state_dict(),
             "tracked_stats": tracked_stats,
+            "global_step": global_step,
         }, is_best, epoch, checkpoint_path, "_pdenet", logger)
 
 if __name__ == "__main__":
