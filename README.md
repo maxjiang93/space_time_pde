@@ -1,6 +1,6 @@
 # Physical Constrained Space Time Super-Resolution 
 
-[Methodolgy Slides](https://docs.google.com/presentation/d/13nI5D33ADybplJs5fFD3gM_txTEn0HiaP7gDBHhw6VM/edit#slide=id.g64a817040a_0_73) | [Writeup](https://www.overleaf.com/project/5deacb4f3a2f63000141b1ba) | [Project Folder](https://drive.google.com/open?id=1KybErSl2vU9vfiV_CSO_ApWsypGzezYs)
+[Progress Update Slides](https://docs.google.com/presentation/d/1YODV57luQjzG2T7SCabdBX0pEg6VO_T7K44V8-K6sIA/edit?usp=sharing) | [Methodolgy Slides](https://docs.google.com/presentation/d/13nI5D33ADybplJs5fFD3gM_txTEn0HiaP7gDBHhw6VM/edit#slide=id.g64a817040a_0_73) | [Writeup](https://www.overleaf.com/project/5deacb4f3a2f63000141b1ba) | [Project Folder](https://drive.google.com/open?id=1KybErSl2vU9vfiV_CSO_ApWsypGzezYs)
 
 This is the code repository for the physical constrained space time super-resolution project.
 
@@ -48,4 +48,7 @@ Here is a rough proposed organization of the code repo. Feel free to add additio
 - ~~Create data loader (@soheil)~~
 - ~~Create U-Net (@soheil)~~
 - ~~Test dataloader + U-Net + lig on small data to overfit (@max)~~
+- ~~Create and debug training and evaluation script (@max)~~
+- ~~Add tensorboard to track training progress (@max)~~
+- ~~Create videos with evaluation (@max)~~
 - LaTeX writeup (@kamyar)
