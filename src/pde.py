@@ -33,7 +33,7 @@ class PDELayer(object):
         self.forward_method = None
 
 
-    def add_equation(self, eqn_str, eqn_name=''):
+    def add_equation(self, eqn_str, eqn_name='', subs_dict=None):
         """Add an equation to the physics layer.
 
         The equation string should represent the expression for computing the residue of a given
@@ -52,6 +52,9 @@ class PDELayer(object):
           an equation.
           eqn_name: str, a name or identifier for this equation entry. E.g., 'div_free'. If none or
           empty, use default of eqn_i where i is an index.
+          subs_dict: dict, a dictionary where the key (str) is the variable to subsitute and val
+          (str) is the expression to substitite the variable with. useful for scenarios such as
+          normalizations and/or non-dimensionalizing expressions.
 
         Raises:
           ValueError: when the variables in the eqn_str do not match that of in_vars and out_vars.
@@ -62,6 +65,12 @@ class PDELayer(object):
 
         # assert that the equation contains the same vars as in_vars and out_vars
         expr = parse_expr(eqn_str)
+
+        # substitute variables in the equation.
+        if subs_dict:
+            for key, val in subs_dict.items():
+                expr = expr.subs(key, val)
+
         valid_var = expr.free_symbols <= (set(self.in_vars)|set(self.out_vars))
         if not valid_var:
             raise ValueError('Variables in the eqn_str ({}) does not match that of '
@@ -131,3 +140,11 @@ class PDELayer(object):
               residue = fn(*inputs_outputs)
               residues.update({key: residue})
             return y, residues
+
+    @property
+    def eqn_num(self):
+        return len(self.eqns_raw)
+
+    @property
+    def eqn_names(self):
+        return list(self.eqns_raw.keys())

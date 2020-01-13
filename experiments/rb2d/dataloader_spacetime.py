@@ -1,10 +1,10 @@
 """RB2 Experiment Dataloader"""
 import os
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Sampler
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-# pylint: disable=too-many-arguments, too-many-instance-attributes, too-many-locals
+# pylint: disable=too-manz-arguments, too-manz-instance-attributes, too-manz-locals
 
 
 class RB2DataLoader(Dataset):
@@ -13,8 +13,8 @@ class RB2DataLoader(Dataset):
     Loads a 2d space + time cubic cutout from the whole simulation.
     """
     def __init__(self, data_dir="./", data_filename="rb2d_ra1e6_s42.npz",
-                 nx=128, ny=128, nt=16, n_samp_pts_per_crop=1024, interp_method='linear',
-                 downsamp_xy=4, downsamp_t=4, normalize_output=False, return_hres=False):
+                 nx=128, nz=128, nt=16, n_samp_pts_per_crop=1024, interp_method='linear',
+                 downsamp_xz=4, downsamp_t=4, normalize_output=False, return_hres=False):
         """
 
         Initialize DataSet
@@ -22,11 +22,11 @@ class RB2DataLoader(Dataset):
           data_dir: str, path to the dataset folder, default="./"
           data_filename: str, name of the dataset file, default="rb2d_ra1e6_s42"
           nx: int, number of 'pixels' in x dimension for high res dataset.
-          ny: int, number of 'pixels' in y dimension for high res dataset.
+          nz: int, number of 'pixels' in z dimension for high res dataset.
           nt: int, number of timesteps in time for high res dataset.
           n_samp_pts_per_crop: int, number of sample points to return per crop.
           interp_method: str, interpolation method. choice of 'linear/nearest'
-          downsamp_xy: int, downsampling factor for the spatial dimensions.
+          downsamp_xz: int, downsampling factor for the spatial dimensions.
           downsamp_t: int, downsampling factor for the temporal dimension.
           normalize_output: bool, whether to normalize the range of each channel to [0, 1].
           return_hres: bool, whether to return the high-resolution data.
@@ -34,14 +34,14 @@ class RB2DataLoader(Dataset):
         self.data_dir = data_dir
         self.data_filename = data_filename
         self.nx_hres = nx
-        self.ny_hres = ny
+        self.nz_hres = nz
         self.nt_hres = nt
-        self.nx_lres = int(nx/downsamp_xy)
-        self.ny_lres = int(ny/downsamp_xy)
+        self.nx_lres = int(nx/downsamp_xz)
+        self.nz_lres = int(nz/downsamp_xz)
         self.nt_lres = int(nt/downsamp_t)
         self.n_samp_pts_per_crop = n_samp_pts_per_crop
         self.interp_method = interp_method
-        self.downsamp_xy = downsamp_xy
+        self.downsamp_xz = downsamp_xz
         self.downsamp_t = downsamp_t
         self.normalize_output = normalize_output
         self.return_hres = return_hres
@@ -51,26 +51,27 @@ class RB2DataLoader(Dataset):
         npdata = np.load(os.path.join(self.data_dir, self.data_filename))
         self.data = np.stack([npdata['p'], npdata['b'], npdata['u'], npdata['w']], axis=0)
         self.data = self.data.astype(np.float32)
-        nc_data, nt_data, nx_data, ny_data = self.data.shape
+        self.data = self.data.transpose(0, 1, 3, 2)  # [c, t, z, x]
+        nc_data, nt_data, nz_data, nx_data = self.data.shape
 
-        # assert nx, ny, nt are viable
-        if (nx > nx_data) or (ny > ny_data) or (nt > nt_data):
-            raise ValueError('Resolution in each spatial temporal dimension x ({}), y({}), t({})'
-                             'must not exceed dataset limits x ({}) y ({}) t ({})'.format(
-                                 nx, ny, nt, nx_data, ny_data, nt_data))
-        if (nt % downsamp_t != 0) or (nx % downsamp_xy != 0) or (ny % downsamp_xy != 0):
-            raise ValueError('nx, ny and nt must be divisible by downsamp factor.')
+        # assert nx, nz, nt are viable
+        if (nx > nx_data) or (nz > nz_data) or (nt > nt_data):
+            raise ValueError('Resolution in each spatial temporal dimension x ({}), z({}), t({})'
+                             'must not exceed dataset limits x ({}) z ({}) t ({})'.format(
+                                 nx, nz, nt, nx_data, nz_data, nt_data))
+        if (nt % downsamp_t != 0) or (nx % downsamp_xz != 0) or (nz % downsamp_xz != 0):
+            raise ValueError('nx, nz and nt must be divisible by downsamp factor.')
 
         self.nx_start_range = np.arange(0, nx_data-nx+1)
-        self.ny_start_range = np.arange(0, ny_data-ny+1)
+        self.nz_start_range = np.arange(0, nz_data-nz+1)
         self.nt_start_range = np.arange(0, nt_data-nt+1)
-        self.rand_grid = np.stack(np.meshgrid(self.nx_start_range,
-                                              self.ny_start_range,
-                                              self.nt_start_range, indexing='ij'), axis=-1)
-        # (xaug, yaug, taug, 3)
+        self.rand_grid = np.stack(np.meshgrid(self.nt_start_range,
+                                              self.nz_start_range,
+                                              self.nx_start_range, indexing='ij'), axis=-1)
+        # (xaug, zaug, taug, 3)
         self.rand_start_id = self.rand_grid.reshape([-1, 3])
-        self.scale_hres = np.array([self.nt_hres, self.nx_hres, self.ny_hres], dtype=np.int32)
-        self.scale_lres = np.array([self.nt_lres, self.nx_lres, self.ny_lres], dtype=np.int32)
+        self.scale_hres = np.array([self.nt_hres, self.nz_hres, self.nx_hres], dtype=np.int32)
+        self.scale_lres = np.array([self.nt_lres, self.nz_lres, self.nx_lres], dtype=np.int32)
 
         # compute channel-wise mean and std
         self._mean = np.mean(self.data, axis=(1, 2, 3))
@@ -86,27 +87,29 @@ class RB2DataLoader(Dataset):
           idx: int, index of the crop to return. must be smaller than len(self).
 
         Returns:
-          space_time_crop_lres: array of shape [4, nt_lres, nx_lres, ny_lres], where 4 are the phys
+          space_time_crop_hres (*optional): array of shape [4, nt_lres, nz_lres, nx_lres],
+          where 4 are the phys channels pbuw.
+          space_time_crop_lres: array of shape [4, nt_lres, nz_lres, nx_lres], where 4 are the phys
           channels pbuw.
-          point_coord: array of shape [n_samp_pts_per_crop, 3], where 3 are the t, x, y dims.
+          point_coord: array of shape [n_samp_pts_per_crop, 3], where 3 are the t, x, z dims.
           point_value: array of shape [n_samp_pts_per_crop, 4], where 4 are the phys channels pbuw.
         """
-        x_id, y_id, t_id = self.rand_start_id[idx]
+        t_id, z_id, x_id = self.rand_start_id[idx]
         space_time_crop_hres = self.data[:,
                                          t_id:t_id+self.nt_hres,
-                                         x_id:x_id+self.nx_hres,
-                                         y_id:y_id+self.ny_hres]
-        # space_time_crop default shape: (c, nt, nx, ny)
+                                         z_id:z_id+self.nz_hres,
+                                         x_id:x_id+self.nx_hres]  # [c, t, z, x]
 
         # create low res grid from hires space time crop
         interp = RegularGridInterpolator(
-            (np.arange(self.nt_hres), np.arange(self.nx_hres), np.arange(self.ny_hres)),
-            values=np.transpose(space_time_crop_hres, axes=(1, 2, 3, 0)), method=self.interp_method)
+            (np.arange(self.nt_hres), np.arange(self.nz_hres), np.arange(self.nx_hres)),
+            values=space_time_crop_hres.transpose(1, 2, 3, 0), method=self.interp_method)
+
         lres_coord = np.stack(np.meshgrid(np.linspace(0, self.nt_hres-1, self.nt_lres),
+                                          np.linspace(0, self.nz_hres-1, self.nz_lres),
                                           np.linspace(0, self.nx_hres-1, self.nx_lres),
-                                          np.linspace(0, self.ny_hres-1, self.ny_lres),
                                           indexing='ij'), axis=-1)
-        space_time_crop_lres = interp(lres_coord).transpose(3, 0, 1, 2)
+        space_time_crop_lres = interp(lres_coord).transpose(3, 0, 1, 2)  # [c, t, z, x]
 
         # create random point samples within space time crop
         point_coord = np.random.rand(self.n_samp_pts_per_crop, 3) * (self.scale_hres - 1)
@@ -115,11 +118,15 @@ class RB2DataLoader(Dataset):
 
         if self.normalize_output:
             space_time_crop_lres = self.normalize_grid(space_time_crop_lres)
-            point_value = self.normalize_grid(point_value)
+            point_value = self.normalize_points(point_value)
 
         return_tensors = [space_time_crop_lres, point_coord, point_value]
+
+        # cast everything to float32
+        return_tensors = [t.astype(np.float32) for t in return_tensors]
+
         if self.return_hres:
-            return_tensors += [space_time_crop_hres]
+            return_tensors = [space_time_crop_hres] + return_tensors
         return tuple(return_tensors)
 
     @property
