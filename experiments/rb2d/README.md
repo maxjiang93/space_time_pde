@@ -1,6 +1,6 @@
 ## Rayleigh-Bernard 2D Experiment
 
-### Dataset Description
+## Dataset
 Below are some instructions for retrieving the sample data. We can generate more data by varying any of the below parameters:
 1. Random seed for the initial perturbation. Set to 42 for the example dataset. At a different random seed the solver will produce results simulated under the same set of physics, but different realisations of the same set of equation given different intial perturbations.
 2. Raleigh number. Set to 1e6 for the example dataset. Higher Raleigh number leads to stronger turbulence.
@@ -9,8 +9,13 @@ Below are some instructions for retrieving the sample data. We can generate more
 ### Retrieving Sample Data
 Download the sample simulation data file (~700 MB) from the server
 ```bash
-wget island.me.berkeley.edu/stsres/rb2d_ra1e6_s42.npz
+bash download_data.sh
 ```
+
+### (Alternatively) Generate new simulation data
+Please refer to the Readme page on in the [simulation folder](../../simulation/2d_rayleigh_benard) to generate new data with a different simulation setup.
+
+### Dataset Description
 Load and parse the data in python
 ```python
 import numpy as np
@@ -36,3 +41,28 @@ Below is a description of the variables in this file:
 - wz: the z derivative of w, shape (200, 512, 128)
 - write_number: the sequence index of the simulation frames
 - sim_time: simulation time.
+
+## Training
+Training is as simple as running the training script. Before training, make sure to mask out the GPU that you want to use.
+```bash
+# for example running with gpu number 0 and 1. adjust batch size such that it is approx 10
+export CUDA_VISIBLE_DEVICES=0,1  
+# run the code in the backend
+nohup python train.py --log_dir='log/run1' &> /dev/null & 
+# checkout the text logs
+tail -f /log/run1/log.txt
+# monitor training progress through tensorboard
+cd log/run1/tensorboard && tensorboard --logdir . --port 6006
+# you may view the tensorboard on http://localhost:6006. Has sample image samples and training curves etc.
+```
+To view input arguments:
+```bash
+python train -h
+```
+The more important arguments are `--alpha_reg` and `--alpha_pde`, which controls the weights between regression loss and pde loss. Setting `--alpha_pde=0` would turn off pde loss during training process.
+
+## Evaluation
+To run evaluation (creates video):
+```bash
+python evaluation.py --ckpt='/path/to/checkpoint.pth.tar'
+```
