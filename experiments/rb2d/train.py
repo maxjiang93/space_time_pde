@@ -210,7 +210,7 @@ def get_args():
     parser.add_argument("--nz", default=128, type=int, help="resolution of high res crop in y.")
     parser.add_argument("--downsamp_t", default=4, type=int,
                         help="down sampling factor in t for low resolution crop.")
-    parser.add_argument("--downsamp_xz", default=4, type=int,
+    parser.add_argument("--downsamp_xz", default=8, type=int,
                         help="down sampling factor in x and y for low resolution crop.")
     parser.add_argument("--n_samp_pts_per_crop", default=1024, type=int,
                         help="number of sample points to draw per crop.")
@@ -221,7 +221,7 @@ def get_args():
                         help="a cap for max number of feature layers throughout the unet.")
     parser.add_argument("--imnet_nf", default=32, type=int,
                         help="number of base number of feature layers in implicit network.")
-    parser.add_argument("--reg_loss_type", default="huber", type=str,
+    parser.add_argument("--reg_loss_type", default="l1", type=str,
                         choices=["l1", "l2", "huber"],
                         help="number of base number of feature layers in implicit network.")
     parser.add_argument("--alpha_reg", default=1., type=float, help="weight of regression loss.")
