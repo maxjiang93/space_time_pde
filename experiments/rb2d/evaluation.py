@@ -83,6 +83,8 @@ def frames_to_video(frames_pattern, save_video_to, frame_rate=10, keep_frames=Fa
            .format(frame_rate=frame_rate, frames_pattern=frames_pattern,
                    save_video_to=save_video_to))
     os.system(cmd)
+    # print
+    print("Saving videos to {}".format(save_video_to))
     # delete frames if keep_frames is not needed
     if not keep_frames:
         frames_dir = os.path.dirname(frames_pattern)
