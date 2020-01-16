@@ -185,12 +185,12 @@ def eval(args, unet, imnet, eval_loader, epoch, global_step, device,
 def get_args():
     # Training settings
     parser = argparse.ArgumentParser(description="Segmentation")
-    parser.add_argument("--batch_size", type=int, default=8, metavar="N",
-                        help="input batch size for training (default: 32)")
-    parser.add_argument("--epochs", type=int, default=20, metavar="N",
-                        help="number of epochs to train (default: 10)")
+    parser.add_argument("--batch_size_per_gpu", type=int, default=10, metavar="N",
+                        help="input batch size for training (default: 10)")
+    parser.add_argument("--epochs", type=int, default=100, metavar="N",
+                        help="number of epochs to train (default: 100)")
     parser.add_argument("--pseudo_epoch_size", type=int, default=3000, metavar="N",
-                        help="number of samples in an pseudo-epoch. (default: 2048)")
+                        help="number of samples in an pseudo-epoch. (default: 3000)")
     parser.add_argument("--lr", type=float, default=1e-2, metavar="R",
                         help="learning rate (default: 0.01)")
     parser.add_argument("--no_cuda", action="store_true", default=False,
@@ -248,6 +248,8 @@ def main():
     use_cuda = (not args.no_cuda) and torch.cuda.is_available()
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     device = torch.device("cuda" if use_cuda else "cpu")
+    # adjust batch size based on the number of gpus available
+    args.batch_size = int(torch.cuda.device_count()) * args.batch_size_per_gpu
 
     # log and create snapshots
     os.makedirs(args.log_dir, exist_ok=True)
