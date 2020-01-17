@@ -185,12 +185,12 @@ def eval(args, unet, imnet, eval_loader, epoch, global_step, device,
 def get_args():
     # Training settings
     parser = argparse.ArgumentParser(description="Segmentation")
-    parser.add_argument("--batch_size", type=int, default=8, metavar="N",
-                        help="input batch size for training (default: 32)")
-    parser.add_argument("--epochs", type=int, default=20, metavar="N",
-                        help="number of epochs to train (default: 10)")
+    parser.add_argument("--batch_size_per_gpu", type=int, default=10, metavar="N",
+                        help="input batch size for training (default: 10)")
+    parser.add_argument("--epochs", type=int, default=100, metavar="N",
+                        help="number of epochs to train (default: 100)")
     parser.add_argument("--pseudo_epoch_size", type=int, default=3000, metavar="N",
-                        help="number of samples in an pseudo-epoch. (default: 2048)")
+                        help="number of samples in an pseudo-epoch. (default: 3000)")
     parser.add_argument("--lr", type=float, default=1e-2, metavar="R",
                         help="learning rate (default: 0.01)")
     parser.add_argument("--no_cuda", action="store_true", default=False,
@@ -210,7 +210,7 @@ def get_args():
     parser.add_argument("--nz", default=128, type=int, help="resolution of high res crop in y.")
     parser.add_argument("--downsamp_t", default=4, type=int,
                         help="down sampling factor in t for low resolution crop.")
-    parser.add_argument("--downsamp_xz", default=4, type=int,
+    parser.add_argument("--downsamp_xz", default=8, type=int,
                         help="down sampling factor in x and y for low resolution crop.")
     parser.add_argument("--n_samp_pts_per_crop", default=1024, type=int,
                         help="number of sample points to draw per crop.")
@@ -221,7 +221,7 @@ def get_args():
                         help="a cap for max number of feature layers throughout the unet.")
     parser.add_argument("--imnet_nf", default=32, type=int,
                         help="number of base number of feature layers in implicit network.")
-    parser.add_argument("--reg_loss_type", default="huber", type=str,
+    parser.add_argument("--reg_loss_type", default="l1", type=str,
                         choices=["l1", "l2", "huber"],
                         help="number of base number of feature layers in implicit network.")
     parser.add_argument("--alpha_reg", default=1., type=float, help="weight of regression loss.")
@@ -248,6 +248,8 @@ def main():
     use_cuda = (not args.no_cuda) and torch.cuda.is_available()
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     device = torch.device("cuda" if use_cuda else "cpu")
+    # adjust batch size based on the number of gpus available
+    args.batch_size = int(torch.cuda.device_count()) * args.batch_size_per_gpu
 
     # log and create snapshots
     os.makedirs(args.log_dir, exist_ok=True)
