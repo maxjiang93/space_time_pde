@@ -3,7 +3,7 @@ sys.path.append("../../src")
 from pde import PDELayer
 
 
-def get_rb2_pde_layer(mean=None, std=None, prandtl=1., rayleigh=1e6):
+def get_rb2_pde_layer(mean=None, std=None, t_crop=2., z_crop=1., x_crop=2., prandtl=1., rayleigh=1e6):
     """Get PDE layer corresponding to the RB2 govening equations.
 
     Args:
@@ -11,6 +11,9 @@ def get_rb2_pde_layer(mean=None, std=None, prandtl=1., rayleigh=1e6):
         the equations. does not normalize if set to None (default).
         std: array of length 4 corresponding to the std of the 4 physical channels, for normalizing
         the equations. does not normalize if set to None (default).
+        t_crop: float, physical temporal span of crop.
+        z_crop: float, physical z-width of crop.
+        x_crop: float, physical x-width of crop.
     """
     # constants
     P = (rayleigh * prandtl)**(-1/2)
@@ -18,10 +21,11 @@ def get_rb2_pde_layer(mean=None, std=None, prandtl=1., rayleigh=1e6):
     # set up variables and equations
     in_vars = 't, x, z'
     out_vars = 'p, b, u, w'
+    nt, nz, nx = 1./t_crop, 1./z_crop, 1./x_crop
     eqn_strs = [
-        f'dif(b,t)-{P}*(dif(dif(b,x),x)+dif(dif(b,z),z))             +(u*dif(b,x)+w*dif(b,z))',
-        f'dif(u,t)-{R}*(dif(dif(u,x),x)+dif(dif(u,z),z))+dif(p,x)    +(u*dif(u,x)+w*dif(u,z))',
-        f'dif(w,t)-{R}*(dif(dif(w,x),x)+dif(dif(w,z),z))+dif(p,z)-b  +(u*dif(w,x)+w*dif(w,z))',
+        f'{nt}*dif(b,t)-{P}*(({nx})**2*dif(dif(b,x),x)+({nz})**2*dif(dif(b,z),z))             +(u*{nx}*dif(b,x)+w*{nz}*dif(b,z))',
+        f'{nt}*dif(u,t)-{R}*(({nx})**2*dif(dif(u,x),x)+({nz})**2*dif(dif(u,z),z))+dif(p,x)    +(u*{nx}*dif(u,x)+w*{nz}*dif(u,z))',
+        f'{nt}*dif(w,t)-{R}*(({nx})**2*dif(dif(w,x),x)+({nz})**2*dif(dif(w,z),z))+dif(p,z)-b  +(u*{nx}*dif(w,x)+w*{nz}*dif(w,z))',
     ]
     # a name/identifier for the equations
     eqn_names = ['transport_eqn_b', 'transport_eqn_u', 'transport_eqn_w']

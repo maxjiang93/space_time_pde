@@ -330,7 +330,8 @@ def main():
         std = trainset.channel_std
     else:
         mean = std = None
-    pde_layer = get_rb2_pde_layer(mean=mean, std=std)
+    pde_layer = get_rb2_pde_layer(mean=mean, std=std,
+        t_crop=args.nt*0.125, z_crop=args.nz*(1./128), x_crop=args.nx*(1./128))
 
     if args.lr_scheduler:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
