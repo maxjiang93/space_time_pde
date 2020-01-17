@@ -45,7 +45,7 @@ Below is a description of the variables in this file:
 ## Training
 Training is as simple as running the training script. Before training, make sure to mask out the GPU that you want to use.
 ```bash
-# for example running with gpu number 0 and 1. adjust batch size such that it is approx 10
+# for example running with gpu number 0 and 1.
 export CUDA_VISIBLE_DEVICES=0,1  
 # run the code in the backend
 nohup python train.py --log_dir='log/run1' &> /dev/null & 
