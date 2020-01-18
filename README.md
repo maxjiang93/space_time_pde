@@ -51,4 +51,8 @@ Here is a rough proposed organization of the code repo. Feel free to add additio
 - ~~Create and debug training and evaluation script (@max)~~
 - ~~Add tensorboard to track training progress (@max)~~
 - ~~Create videos with evaluation (@max)~~
+- Creating different simulation data (same boundary /physical condition, different initialization seed) (@soheil)
+- Training on __one__ simulation and testing on __same__ b.c., __different__ initial condition (Transferability through initial conditions (I)) (@soheil)
+- Training on __multiple__ simulations (same b.c., different init.). Testing on same b.c., different initial condition (Transferability through initial conditions (II)). (@soheil)
+- Training on various b.c. and various initial conditions. Testing on different b.c. and a random initial condition (Transferability through b.c. & initial conditions). (@soheil)
 - LaTeX writeup (@kamyar)
