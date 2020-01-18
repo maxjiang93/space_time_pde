@@ -5,7 +5,7 @@ Before starting these steps, make sure that you have a working conda installatio
 ```bash
 # Download and run the official installation script.
 wget https://raw.githubusercontent.com/DedalusProject/conda_dedalus/master/install_conda.sh
-bash conda_install.sh
+bash install_conda.sh
 ```
 
 ## Create the simulation file for the ML pipeline
