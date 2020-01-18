@@ -52,7 +52,8 @@ Here is a rough proposed organization of the code repo. Feel free to add additio
 - ~~Add tensorboard to track training progress (@max)~~
 - ~~Create videos with evaluation (@max)~~
 - Create simulation data (similar b.c., different init. (initialization seeds)) (@soheil)
-    - Train on __one__ simulation and test on __same__ b.c. & a __different__ init. (Effect of init. (I)) (@soheil)
-    - Train on __multiple__ simulations (__same__ b.c. & __different__ inits.). Test on __same__ b.c. & a __different__ init. (Effect of init. (II)). (@soheil)
-    - Train on __different__ b.c. & __different__ inits. Test on a __different__ b.c. & a random init. (Effect of b.c. & init.). (@soheil)
+- Rayleigh-Benard Training Cases (@soheil)
+    - Train on __one__ simulation and test on __same__ b.c. & a __different__ init. (Effect of init. (I)) 
+    - Train on __multiple__ simulations (__same__ b.c. & __different__ inits.). Test on __same__ b.c. & a __different__ init. (Effect of init. (II)). 
+    - Train on __different__ b.c. & __different__ inits. Test on a __different__ b.c. & a random init. (Effect of b.c. & init.). 
 - LaTeX writeup (@kamyar @soheil)
