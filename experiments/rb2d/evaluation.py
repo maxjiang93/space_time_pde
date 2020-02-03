@@ -8,7 +8,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import subprocess
 import shutil
-
+import os
 # import our modules
 import sys
 sys.path.append("../../src")
@@ -18,7 +18,6 @@ from pde import PDELayer
 from local_implicit_grid import query_local_implicit_grid
 import dataloader_spacetime as loader
 from physics import get_rb2_pde_layer
-
 
 def evaluate_feat_grid(pde_layer, latent_grid, t_seq, z_seq, x_seq, mins, maxs, pseudo_batch_size):
     """Evaluate latent feature grid at fixed intervals.
@@ -195,7 +194,7 @@ def model_inference(args, lres, pde_layer):
     pde_layer.update_forward_method(fwd_fn)
 
     res_dict = evaluate_feat_grid(pde_layer, latent_grid, t_seq, z_seq, x_seq, mins, maxs,
-                                  12000)
+                                  args.eval_pseudo_batch_size)
 
     return res_dict
 
@@ -216,6 +215,9 @@ def get_args():
                         help="frame rate for output video (default: 10)")
     parser.add_argument("--keep_frames", dest='keep_frames', action='store_true')
     parser.add_argument("--no_keep_frames", dest='keep_frames', action='store_false')
+    parser.add_argument("--eval_pseudo_batch_size", type=int, default=10000,
+                        help="psudo batch size for querying the grid. set to a smaller"
+                             " value if OOM error occurs")
     parser.set_defaults(keep_frames=False)
     args = parser.parse_args()
     return args
