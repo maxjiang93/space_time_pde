@@ -5,6 +5,8 @@ import os
 import torch
 import numpy as np
 from tqdm import tqdm
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import subprocess
 import shutil
