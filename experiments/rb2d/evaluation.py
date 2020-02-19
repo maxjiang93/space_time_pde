@@ -213,6 +213,12 @@ def get_args():
                         help="t resolution during evaluation (default: 192)")
     parser.add_argument('--ckpt', type=str, required=True, help="path to checkpoint")
     parser.add_argument("--save_path", type=str, default='eval')
+    parser.add_argument("--eval_dataset", type=str, required=True)
+    parser.add_argument("--lres_interp", type=str, default='linear',
+                        help="str, interpolation scheme for generating low res. choices of 'linear', 'nearest'")
+    parser.add_argument("--lres_filter", type=str, default='gaussian',
+                        help=" str, filter to apply on original high-res image before \
+                        interpolation. choices of 'none', 'gaussian', 'uniform', 'median', 'maximum'")
     parser.add_argument("--frame_rate", type=int, default=10, metavar="N",
                         help="frame rate for output video (default: 10)")
     parser.add_argument("--keep_frames", dest='keep_frames', action='store_true')
@@ -234,9 +240,9 @@ def main():
     print(args)
     # prepare dataset
     dataset = loader.RB2DataLoader(
-        data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
+        data_dir=args.data_folder, data_filename=args.eval_dataset,
         nx=512, nz=128, nt=192, n_samp_pts_per_crop=1,
-        interp_method='linear', downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
+        lres_interp=args.lres_interp, lres_filter=args.lres_filter, downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
         normalize_output=args.normalize_channels, return_hres=True)
 
     # extract data
