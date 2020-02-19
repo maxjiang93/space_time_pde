@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, Sampler
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy import ndimage
+import warnings
 # pylint: disable=too-manz-arguments, too-manz-instance-attributes, too-manz-locals
 
 
@@ -52,6 +53,10 @@ class RB2DataLoader(Dataset):
         self.lres_filter = lres_filter
         self.lres_interp = lres_interp
 
+        # warn about median filter
+        if lres_filter == 'median':
+            warnings.warn("the median filter is very slow...", RuntimeWarning)
+
         # concatenating pressure, temperature, x-velocity, and z-velocity as a 4 channel array: pbuw
         # shape: (4, 200, 512, 128)
         npdata = np.load(os.path.join(self.data_dir, self.data_filename))
@@ -89,12 +94,13 @@ class RB2DataLoader(Dataset):
     def filter(self, signal):
         """Filter a given signal with a choice of filter type (self.lres_filter).
         """
-        filter_size = [1, self.downsamp_t+1, self.downsamp_xz+1, self.downsamp_xz+1]
+        signal = signal.copy()
+        filter_size = [1, self.downsamp_t*2-1, self.downsamp_xz*2-1, self.downsamp_xz*2-1]
 
         if self.lres_filter == 'none' or (not self.lres_filter):
             output = signal
         elif self.lres_filter == 'gaussian':
-            sigma = [0, int(self.downsamp_t), int(self.downsamp_xz), int(self.downsamp_xz)]
+            sigma = [0, int(self.downsamp_t/2), int(self.downsamp_xz/2), int(self.downsamp_xz/2)]
             output = ndimage.gaussian_filter(signal, sigma=sigma)
         elif self.lres_filter == 'uniform':
             output = ndimage.uniform_filter(signal, size=filter_size)
@@ -129,11 +135,11 @@ class RB2DataLoader(Dataset):
 
         # create low res grid from hi res space time crop
         # apply filter
-        space_time_crop_hres = self.filter(space_time_crop_hres)
+        space_time_crop_hres_fil = self.filter(space_time_crop_hres)
 
         interp = RegularGridInterpolator(
             (np.arange(self.nt_hres), np.arange(self.nz_hres), np.arange(self.nx_hres)),
-            values=space_time_crop_hres.transpose(1, 2, 3, 0), method=self.lres_interp)
+            values=space_time_crop_hres_fil.transpose(1, 2, 3, 0), method=self.lres_interp)
 
         lres_coord = np.stack(np.meshgrid(np.linspace(0, self.nt_hres-1, self.nt_lres),
                                           np.linspace(0, self.nz_hres-1, self.nz_lres),
