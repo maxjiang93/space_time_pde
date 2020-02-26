@@ -6,6 +6,8 @@ import os
 from glob import glob
 import numpy as np
 from collections import defaultdict
+import time
+import datetime
 np.set_printoptions(precision=4)
 
 import torch
@@ -25,7 +27,36 @@ from local_implicit_grid import query_local_implicit_grid
 import dataloader_spacetime as loader
 from physics import get_rb2_pde_layer
 
+# FOR DISTRIBUTED:
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as TDDP
+try:
+    from apex.parallel import DistributedDataParallel as ADDP
+    from apex import amp
+    HASAPEX = True
+except Exception as e:
+    import_error = e
+    HASAPEX = False
+    
+
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+
+    # initialize the process group
+    dist.init_process_group("gloo", rank=rank, world_size=world_size)
+
+    # Explicitly setting seed to make sure that models created in two processes
+    # start from same random weights and biases.
+    torch.manual_seed(42)
+
+
+def cleanup():
+    dist.destroy_process_group()
+
 # pylint: disable=no-member
+
 
 
 def loss_functional(loss_type):
@@ -72,7 +103,11 @@ def train(args, unet, imnet, train_loader, epoch, global_step, device,
         pde_loss = loss_func(pde_tensors, torch.zeros_like(pde_tensors))
         loss = args.alpha_reg * reg_loss + args.alpha_pde * pde_loss
 
-        loss.backward()
+        if args.use_apex:
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            loss.backward()
 
         # gradient clipping
         torch.nn.utils.clip_grad_value_(unet.module.parameters(), args.clip_grad)
@@ -83,21 +118,25 @@ def train(args, unet, imnet, train_loader, epoch, global_step, device,
         tot_loss += loss.item()
         count += input_grid.size()[0]
         if batch_idx % args.log_interval == 0:
-            # logger log
-            logger.info(
-                "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss Sum: {:.6f}\t"
-                "Loss Reg: {:.6f}\tLoss Pde: {:.6f}".format(
-                    epoch, batch_idx * len(input_grid), len(train_loader) * len(input_grid),
-                    100. * batch_idx / len(train_loader), loss.item(),
-                    args.alpha_reg * reg_loss, args.alpha_pde * pde_loss))
-            # tensorboard log
-            writer.add_scalar('train/reg_loss_unweighted', reg_loss, global_step=int(global_step))
-            writer.add_scalar('train/pde_loss_unweighted', pde_loss, global_step=int(global_step))
-            writer.add_scalar('train/sum_loss', loss, global_step=int(global_step))
-            writer.add_scalars('train/losses_weighted',
-                               {"reg_loss": args.alpha_reg * reg_loss,
-                                "pde_loss": args.alpha_pde * pde_loss,
-                                "sum_loss": loss}, global_step=int(global_step))
+            if args.rank == 0:
+                # logger log
+                logger.info(
+                    "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss Sum: {:.6f}\t"
+                    "Loss Reg: {:.6f}\tLoss Pde: {:.6f}".format(
+                        epoch, batch_idx * len(input_grid) * args.nprocs, 
+                        len(train_loader) * len(input_grid) * args.nprocs,
+                        100. * batch_idx / len(train_loader), loss.item(),
+                        args.alpha_reg * reg_loss, args.alpha_pde * pde_loss))
+                # tensorboard log
+                writer.add_scalar('train/reg_loss_unweighted', 
+                                  reg_loss, global_step=int(global_step))
+                writer.add_scalar('train/pde_loss_unweighted', 
+                                  pde_loss, global_step=int(global_step))
+                writer.add_scalar('train/sum_loss', loss, global_step=int(global_step))
+                writer.add_scalars('train/losses_weighted',
+                                   {"reg_loss": args.alpha_reg * reg_loss,
+                                    "pde_loss": args.alpha_pde * pde_loss,
+                                    "sum_loss": loss}, global_step=int(global_step))
 
         global_step += 1
     tot_loss /= count
@@ -165,21 +204,22 @@ def eval(args, unet, imnet, eval_loader, epoch, global_step, device,
                          .reshape([nb, len(t_seq), len(z_seq), len(x_seq)]))
 
     # log the imgs sample-by-sample
-    for samp_id in range(nb):
-        for key in res_dict.keys():
-            field = res_dict[key][samp_id]  # [nt, nz, nx]
-            # add predicted slices
-            images = utils.batch_colorize_scalar_tensors(field)  # [nt, nz, nx, 3]
+    if args.rank == 0:
+        for samp_id in range(nb):
+            for key in res_dict.keys():
+                field = res_dict[key][samp_id]  # [nt, nz, nx]
+                # add predicted slices
+                images = utils.batch_colorize_scalar_tensors(field)  # [nt, nz, nx, 3]
 
-            writer.add_images('sample_{}/{}/predicted'.format(samp_id, key), images,
-                dataformats='NHWC', global_step=int(global_step))
-            # add ground truth slices (only for phys channels)
-            if key in phys_channels:
-                gt_fields = hres_grid[samp_id, phys2id[key], ::int(nt/8)]  # [nt, nz, nx]
-                gt_images = utils.batch_colorize_scalar_tensors(gt_fields)  # [nt, nz, nx, 3]
-
-                writer.add_images('sample_{}/{}/ground_truth'.format(samp_id, key), gt_images,
+                writer.add_images('sample_{}/{}/predicted'.format(samp_id, key), images,
                     dataformats='NHWC', global_step=int(global_step))
+                # add ground truth slices (only for phys channels)
+                if key in phys_channels:
+                    gt_fields = hres_grid[samp_id, phys2id[key], ::int(nt/8)]  # [nt, nz, nx]
+                    gt_images = utils.batch_colorize_scalar_tensors(gt_fields)  # [nt, nz, nx, 3]
+
+                    writer.add_images('sample_{}/{}/ground_truth'.format(samp_id, key), gt_images,
+                        dataformats='NHWC', global_step=int(global_step))
 
 
 def get_args():
@@ -187,10 +227,12 @@ def get_args():
     parser = argparse.ArgumentParser(description="Segmentation")
     parser.add_argument("--batch_size_per_gpu", type=int, default=10, metavar="N",
                         help="input batch size for training (default: 10)")
+    parser.add_argument("--nprocs", type=int, default=2, metavar="N",
+                        help="number of parallel gpu processes (default: 2)")
     parser.add_argument("--epochs", type=int, default=100, metavar="N",
                         help="number of epochs to train (default: 100)")
-    parser.add_argument("--pseudo_epoch_size", type=int, default=3000, metavar="N",
-                        help="number of samples in an pseudo-epoch. (default: 3000)")
+    parser.add_argument("--pseudo_epoch_size", type=int, default=3360, metavar="N",
+                        help="number of samples in an pseudo-epoch. (default: 3360)")
     parser.add_argument("--lr", type=float, default=1e-2, metavar="R",
                         help="learning rate (default: 0.01)")
     parser.add_argument("--no_cuda", action="store_true", default=False,
@@ -235,21 +277,44 @@ def get_args():
     parser.add_argument("--lr_scheduler", dest='lr_scheduler', action='store_true')
     parser.add_argument("--no_lr_scheduler", dest='lr_scheduler', action='store_false')
     parser.set_defaults(lr_scheduler=True)
+    parser.add_argument("--use_apex", dest='use_apex', action='store_true')
+    parser.add_argument("--no_use_apex", dest='use_apex', action='store_false')
+    parser.set_defaults(use_apex=True)
     parser.add_argument("--clip_grad", default=1., type=float,
                         help="clip gradient to this value. large value basically deactivates it.")
+    parser.add_argument("--lres_filter", default='none', type=str,
+                        help=("type of filter for generating low res input data. "
+                              "choice of 'none', 'gaussian', 'uniform', 'median', 'maximum'."))
+    parser.add_argument("--lres_interp", default='linear', type=str,
+                        help=("type of interpolation scheme for generating low res input data."
+                              "choice of 'linear', 'nearest'"))
+    parser.add_argument("--apex_optim_level", default="O0", type=str, help="Apex Optimization Level. O0: FP32 training, O1: Conservative Mixed Precision, O2: Fast Mixed Precision, O3: FP16 training.")
 
     args = parser.parse_args()
     return args
 
 
-def main():
-    args = get_args()
+def main_ddp(rank, world_size, args):
+    setup(rank, world_size)
+    args.rank = rank
+    if args.use_apex and (not HASAPEX):
+        if rank == 0:
+            print(import_error)
+            warnings.warn(
+                "Failed to import Apex. Falling back to PyTorch DistributedDataParallel.",
+                ImportError)
+        args.use_apex = False
+    DDP = ADDP if args.use_apex else TDDP
+    
+#     n_per_rank = torch.cuda.device_count() // world_size
+#     device_ids = list(range(rank * n_per_rank, (rank + 1) * n_per_rank))
+    device_ids = [args.rank]
+    torch.cuda.set_device(args.rank)
 
-    use_cuda = (not args.no_cuda) and torch.cuda.is_available()
-    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-    device = torch.device("cuda" if use_cuda else "cpu")
-    # adjust batch size based on the number of gpus available
-    args.batch_size = int(torch.cuda.device_count()) * args.batch_size_per_gpu
+    kwargs = {'num_workers': 1, 'pin_memory': True}
+    device = torch.device(device_ids[0])
+    # no need to adjust batch size. batch size = batch_size_per_gpu
+    args.batch_size = args.batch_size_per_gpu
 
     # log and create snapshots
     os.makedirs(args.log_dir, exist_ok=True)
@@ -258,28 +323,35 @@ def main():
     logger = utils.get_logger(log_dir=args.log_dir)
     with open(os.path.join(args.log_dir, "params.json"), 'w') as fh:
         json.dump(args.__dict__, fh, indent=2)
-    logger.info("%s", repr(args))
+    if args.rank == 0: logger.info("%s", repr(args))
+        
+    logger.info(f"[Rank] {rank:2d} [Cuda IDs] {device_ids}")
 
     # tensorboard writer
     writer = SummaryWriter(log_dir=os.path.join(args.log_dir, 'tensorboard'))
 
     # random seed for reproducability
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
+    torch.manual_seed((args.seed+1) * rank)
+    np.random.seed((args.seed+1) * rank)
 
     # create dataloaders
     trainset = loader.RB2DataLoader(
         data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
         nx=args.nx, nz=args.nz, nt=args.nt, n_samp_pts_per_crop=args.n_samp_pts_per_crop,
-        interp_method='linear', downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
-        normalize_output=args.normalize_channels, return_hres=False)
+        downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
+        normalize_output=args.normalize_channels, return_hres=False,
+        lres_filter=args.lres_filter, lres_interp=args.lres_interp
+    )
     evalset = loader.RB2DataLoader(
         data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
         nx=args.nx, nz=args.nz, nt=args.nt, n_samp_pts_per_crop=args.n_samp_pts_per_crop,
-        interp_method='linear', downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
-        normalize_output=args.normalize_channels, return_hres=True)
+        downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
+        normalize_output=args.normalize_channels, return_hres=True,
+        lres_filter=args.lres_filter, lres_interp=args.lres_interp
+    )
 
-    train_sampler = RandomSampler(trainset, replacement=True, num_samples=args.pseudo_epoch_size)
+    nsamp_per_proc = args.pseudo_epoch_size // args.nprocs
+    train_sampler = RandomSampler(trainset, replacement=True, num_samples=nsamp_per_proc)
     eval_sampler = RandomSampler(evalset, replacement=True, num_samples=args.num_log_images)
 
     train_loader = DataLoader(trainset, batch_size=args.batch_size, shuffle=False, drop_last=True,
@@ -291,38 +363,56 @@ def main():
     unet = UNet3d(in_features=4, out_features=args.lat_dims, igres=trainset.scale_lres,
                   nf=args.unet_nf, mf=args.unet_mf)
     imnet = ImNet(dim=3, in_features=args.lat_dims, out_features=4, nf=args.imnet_nf)
+    
+    if args.resume:        
+        # configure map_location properly
+        rank0_devices = [x - rank * len(device_ids) for x in device_ids]
+        device_pairs = zip(rank0_devices, device_ids)
+        map_location = {'cuda:%d' % x: 'cuda:%d' % y for x, y in device_pairs}
+
+        resume_dict = torch.load(args.resume, map_location=map_location)
+        start_ep = resume_dict["epoch"]
+        global_step = resume_dict["global_step"]
+        tracked_stats = resume_dict["tracked_stats"]
+        unet.load_state_dict(resume_dict["unet_state_dict"])
+        imnet.load_state_dict(resume_dict["imnet_state_dict"])
+    
+    unet.to(device)
+    imnet.to(device)
+    
     all_model_params = list(unet.parameters())+list(imnet.parameters())
 
     if args.optim == "sgd":
         optimizer = optim.SGD(all_model_params, lr=args.lr)
     else:
         optimizer = optim.Adam(all_model_params, lr=args.lr)
-
-    start_ep = 0
-    global_step = np.zeros(1, dtype=np.uint32)
-    tracked_stats = np.inf
-
+    
+    if args.use_apex:
+        (unet, imnet), optimizer = amp.initialize([unet, imnet], optimizer, opt_level=args.apex_optim_level)
+    
+    if args.use_apex:
+        unet = DDP(unet)
+        imnet = DDP(imnet)
+    else:
+        unet = DDP(unet, device_ids=device_ids)
+        imnet = DDP(imnet, device_ids=device_ids)
+        
     if args.resume:
-        resume_dict = torch.load(args.resume)
-        start_ep = resume_dict["epoch"]
-        global_step = resume_dict["global_step"]
-        tracked_stats = resume_dict["tracked_stats"]
-        unet.load_state_dict(resume_dict["unet_state_dict"])
-        imnet.load_state_dict(resume_dict["imnet_state_dict"])
         optimizer.load_state_dict(resume_dict["optim_state_dict"])
         for state in optimizer.state.values():
             for k, v in state.items():
                 if isinstance(v, torch.Tensor):
                     state[k] = v.to(device)
 
-    unet = nn.DataParallel(unet)
-    unet.to(device)
-    imnet = nn.DataParallel(imnet)
-    imnet.to(device)
+    start_ep = 0
+    global_step = np.zeros(1, dtype=np.uint32)
+    tracked_stats = np.inf
+
 
     model_param_count = lambda model: sum(x.numel() for x in model.parameters())
-    logger.info("{}(unet) + {}(imnet) paramerters in total".format(model_param_count(unet),
-                                                                   model_param_count(imnet)))
+    if args.rank == 0: 
+        logger.info("{}(unet) + {}(imnet) paramerters in total".format(
+            model_param_count(unet), model_param_count(imnet)))
 
     checkpoint_path = os.path.join(args.log_dir, "checkpoint_latest.pth.tar")
 
@@ -340,10 +430,13 @@ def main():
 
     # training loop
     for epoch in range(start_ep + 1, args.epochs + 1):
+        t0 = time.time()
         loss = train(args, unet, imnet, train_loader, epoch, global_step, device, logger, writer,
                      optimizer, pde_layer)
-        eval(args, unet, imnet, eval_loader, epoch, global_step, device, logger, writer, optimizer,
-            pde_layer)
+        t1 = time.time()
+        eval(args, unet, imnet, eval_loader, epoch, global_step, device, logger, writer, 
+             optimizer, pde_layer)
+        t2 = time.time()
         if args.lr_scheduler:
             scheduler.step(loss)
         if loss < tracked_stats:
@@ -351,15 +444,30 @@ def main():
             is_best = True
         else:
             is_best = False
-
-        utils.save_checkpoint({
-            "epoch": epoch,
-            "unet_state_dict": unet.module.state_dict(),
-            "imnet_state_dict": imnet.module.state_dict(),
-            "optim_state_dict": optimizer.state_dict(),
-            "tracked_stats": tracked_stats,
-            "global_step": global_step,
-        }, is_best, epoch, checkpoint_path, "_pdenet", logger)
+        if args.rank == 0:
+            utils.save_checkpoint({
+                "epoch": epoch,
+                "unet_state_dict": unet.module.state_dict(),
+                "imnet_state_dict": imnet.module.state_dict(),
+                "optim_state_dict": optimizer.state_dict(),
+                "tracked_stats": tracked_stats,
+                "global_step": global_step,
+            }, is_best, epoch, checkpoint_path, "_pdenet", logger)
+        t3 = time.time()
+        if args.rank == 0:
+            logger.info(f"Total time per epoch: {datetime.timedelta(seconds=t3-t0)} ({t3-t0:.2f} secs)")
+            logger.info(f"Train time per epoch: {datetime.timedelta(seconds=t1-t0)} ({t1-t0:.2f} secs)")
+            logger.info(f"Eval  time per epoch: {datetime.timedelta(seconds=t2-t1)} ({t2-t1:.2f} secs)")
+        
+    cleanup()
+    
+def main():
+    args = get_args()
+    
+    mp.spawn(main_ddp,
+            args=(args.nprocs, args),
+            nprocs=args.nprocs,
+            join=True)
 
 if __name__ == "__main__":
     main()
