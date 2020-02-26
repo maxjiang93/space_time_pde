@@ -36,7 +36,7 @@ def main():
 	# sort based on write_number
 	sort_idx = np.argsort(var_dict['write_number'])
 	for key in var_dict.keys():
-		var_dict[key] = var_dict[key][sort_idx]
+		var_dict[key] = var_dict[key][sort_idx].astype(np.float32)
 		
 	np.savez(args.outfile, **var_dict)
 
