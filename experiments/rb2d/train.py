@@ -237,6 +237,12 @@ def get_args():
     parser.set_defaults(lr_scheduler=True)
     parser.add_argument("--clip_grad", default=1., type=float,
                         help="clip gradient to this value. large value basically deactivates it.")
+    parser.add_argument("--lres_filter", default='none', type=str,
+                        help=("type of filter for generating low res input data. "
+                              "choice of 'none', 'gaussian', 'uniform', 'median', 'maximum'."))
+    parser.add_argument("--lres_interp", default='linear', type=str,
+                        help=("type of interpolation scheme for generating low res input data."
+                              "choice of 'linear', 'nearest'"))
 
     args = parser.parse_args()
     return args
@@ -271,13 +277,17 @@ def main():
     trainset = loader.RB2DataLoader(
         data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
         nx=args.nx, nz=args.nz, nt=args.nt, n_samp_pts_per_crop=args.n_samp_pts_per_crop,
-        interp_method='linear', downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
-        normalize_output=args.normalize_channels, return_hres=False)
+        downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
+        normalize_output=args.normalize_channels, return_hres=False,
+        lres_filter=args.lres_filter, lres_interp=args.lres_interp
+    )
     evalset = loader.RB2DataLoader(
         data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
         nx=args.nx, nz=args.nz, nt=args.nt, n_samp_pts_per_crop=args.n_samp_pts_per_crop,
-        interp_method='linear', downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
-        normalize_output=args.normalize_channels, return_hres=True)
+        downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
+        normalize_output=args.normalize_channels, return_hres=True,
+        lres_filter=args.lres_filter, lres_interp=args.lres_interp
+    )
 
     train_sampler = RandomSampler(trainset, replacement=True, num_samples=args.pseudo_epoch_size)
     eval_sampler = RandomSampler(evalset, replacement=True, num_samples=args.num_log_images)
