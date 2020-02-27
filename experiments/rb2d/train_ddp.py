@@ -288,7 +288,11 @@ def get_args():
     parser.add_argument("--lres_interp", default='linear', type=str,
                         help=("type of interpolation scheme for generating low res input data."
                               "choice of 'linear', 'nearest'"))
-    parser.add_argument("--apex_optim_level", default="O0", type=str, help="Apex Optimization Level. O0: FP32 training, O1: Conservative Mixed Precision, O2: Fast Mixed Precision, O3: FP16 training.")
+    parser.add_argument("--apex_optim_level", default="O0", type=str, 
+                        help=("Apex Optimization Level. O0: FP32 training, "
+                              "O1: Conservative Mixed Precision, O2: Fast Mixed Precision, O3: FP16 training."))
+    parser.add_argument("--output_timing", default="", type=str, 
+                        help="output time for this run to file. Useful for running scaling experiments.")
 
     args = parser.parse_args()
     return args
@@ -296,6 +300,7 @@ def get_args():
 
 def main_ddp(rank, world_size, args):
     setup(rank, world_size)
+
     args.rank = rank
     if args.use_apex and (not HASAPEX):
         if rank == 0:
@@ -458,12 +463,28 @@ def main_ddp(rank, world_size, args):
             logger.info(f"Total time per epoch: {datetime.timedelta(seconds=t3-t0)} ({t3-t0:.2f} secs)")
             logger.info(f"Train time per epoch: {datetime.timedelta(seconds=t1-t0)} ({t1-t0:.2f} secs)")
             logger.info(f"Eval  time per epoch: {datetime.timedelta(seconds=t2-t1)} ({t2-t1:.2f} secs)")
+            if epoch == 1 and args.output_timing:
+                if not os.path.exists(args.output_timing):
+                    newfile = True
+                else:
+                    newfile = False
+                with open(args.output_timing, "a") as fh:
+                    if newfile:
+                        fh.write("num_gpu,opt_level,total_time_per_epoch,train_time_per_epoch,eval_time_per_epoch\n")
+                    fh.write(("{num_gpu},{opt_level},{tot_time},{train_time},{eval_time}\n"
+                              .format(num_gpu=args.nprocs, opt_level=args.apex_optim_level, 
+                                      tot_time=t3-t0, train_time=t1-t0, eval_time=t2-t1)))
         
     cleanup()
     
 def main():
     args = get_args()
-    
+
+    ndevices = torch.cuda.device_count()
+    if args.nprocs > ndevices:
+        raise RuntimeError("Number of processes ({}) is greater than available GPU devices ({}). "
+                           "Rerun with --nprocs=N where N <= {}.".format(args.nprocs, ndevices, ndevices))    
+
     mp.spawn(main_ddp,
             args=(args.nprocs, args),
             nprocs=args.nprocs,
