@@ -40,9 +40,9 @@ except Exception as e:
     HASAPEX = False
     
 
-def setup(rank, world_size):
+def setup(rank, world_size, offset=0):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
+    os.environ['MASTER_PORT'] = str(12355+offset)
 
     # initialize the process group
     dist.init_process_group("gloo", rank=rank, world_size=world_size)
@@ -293,13 +293,16 @@ def get_args():
                               "O1: Conservative Mixed Precision, O2: Fast Mixed Precision, O3: FP16 training."))
     parser.add_argument("--output_timing", default="", type=str, 
                         help="output time for this run to file. Useful for running scaling experiments.")
+    parser.add_argument("--comm_backend", default="gloo", type=str,
+                        help="communication backend for distributed computing. choices: 'gloo', 'mpi', 'nccl'.")
 
     args = parser.parse_args()
     return args
 
 
 def main_ddp(rank, world_size, args):
-    setup(rank, world_size)
+    offset = int(args.apex_optim_level[1])*world_size+rank
+    setup(rank, world_size, offset=offset)
 
     args.rank = rank
     if args.use_apex and (not HASAPEX):
