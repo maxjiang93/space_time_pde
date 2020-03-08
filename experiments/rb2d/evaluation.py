@@ -101,6 +101,7 @@ def export_video(args, res_dict, hres, lres, dataset):
         lres = dataset.denormalize_grid(lres.copy())
         pred = np.stack([res_dict[key] for key in phys_channels], axis=0)
         pred = dataset.denormalize_grid(pred)
+        np.savez_compressed(args.save_path+'highres_lowres_pred',h res=lres, lres=lres, pred=pred)
 
     os.makedirs(args.save_path, exist_ok=True)
     # enumerate through physical channels first
