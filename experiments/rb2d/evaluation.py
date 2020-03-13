@@ -20,6 +20,7 @@ from pde import PDELayer
 from local_implicit_grid import query_local_implicit_grid
 import dataloader_spacetime as loader
 from physics import get_rb2_pde_layer
+from torch_flow_stats import *
 
 def evaluate_feat_grid(pde_layer, latent_grid, t_seq, z_seq, x_seq, mins, maxs, pseudo_batch_size):
     """Evaluate latent feature grid at fixed intervals.
@@ -92,6 +93,46 @@ def frames_to_video(frames_pattern, save_video_to, frame_rate=10, keep_frames=Fa
         shutil.rmtree(frames_dir)
 
 
+def calculate_flow_stats(pred, hres, visc=0.0001):
+    data = pred
+    uw = np.transpose(data[2:4,:,:,1:1+128], (1, 0, 2, 3))
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    uw = torch.tensor(uw, device=device).float()
+    stats = compute_all_stats(uw[2:,:,:,:], viscosity=visc, description=False)
+    s = [stats[..., i].item() for i in range(stats.shape[0])]
+
+    file = open("REPORT___FlowStats_Pred_vs_GroundTruth.txt", "w")
+
+    file.write("***** Pred Data Flow Statistics ******\n")
+    file.write("Total Kinetic Energy     : {}\n".format(s[0]))
+    file.write("Dissipation              : {}\n".format(s[1]))
+    file.write("Rms velocity             : {}\n".format(s[2]))
+    file.write("Taylor Micro. Scale      : {}\n".format(s[3]))
+    file.write("Taylor-scale Reynolds    : {}\n".format(s[4]))
+    file.write("Kolmogorov time sclae    : {}\n".format(s[5]))
+    file.write("Kolmogorov length sclae  : {}\n".format(s[6]))
+    file.write("Integral scale           : {}\n".format(s[7]))
+    file.write("Large eddy turnover time : {}\n\n\n\n\n".format(s[8]))
+
+    data = hres
+    uw = np.transpose(data[2:4,:,:,1:1+128], (1, 0, 2, 3))
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    uw = torch.tensor(uw, device=device).float()
+    stats = compute_all_stats(uw[2:,:,:,:], viscosity=visc, description=False)
+    s = [stats[..., i].item() for i in range(stats.shape[0])]
+
+    file.write("***** Ground Truth Data Flow Statistics ******\n")
+    file.write("Total Kinetic Energy     : {}\n".format(s[0]))
+    file.write("Dissipation              : {}\n".format(s[1]))
+    file.write("Rms velocity             : {}\n".format(s[2]))
+    file.write("Taylor Micro. Scale      : {}\n".format(s[3]))
+    file.write("Taylor-scale Reynolds    : {}\n".format(s[4]))
+    file.write("Kolmogorov time sclae    : {}\n".format(s[5]))
+    file.write("Kolmogorov length sclae  : {}\n".format(s[6]))
+    file.write("Integral scale           : {}\n".format(s[7]))
+    file.write("Large eddy turnover time : {}\n".format(s[8]))
+
+
 def export_video(args, res_dict, hres, lres, dataset):
     """Export inference result as a video.
     """
@@ -101,7 +142,8 @@ def export_video(args, res_dict, hres, lres, dataset):
         lres = dataset.denormalize_grid(lres.copy())
         pred = np.stack([res_dict[key] for key in phys_channels], axis=0)
         pred = dataset.denormalize_grid(pred)
-        np.savez_compressed(args.save_path+'highres_lowres_pred',h res=lres, lres=lres, pred=pred)
+        calculate_flow_stats(pred, hres)       # Warning: only works with pytorch > v1.3 and CUDA >= v10.1
+        # np.savez_compressed(args.save_path+'highres_lowres_pred', hres=lres, lres=lres, pred=pred)
 
     os.makedirs(args.save_path, exist_ok=True)
     # enumerate through physical channels first
