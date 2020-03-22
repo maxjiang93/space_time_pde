@@ -26,6 +26,7 @@ from implicit_net import ImNet
 from local_implicit_grid import query_local_implicit_grid
 import dataloader_spacetime as loader
 from physics import get_rb2_pde_layer
+from distributed import init_workers
 
 # FOR DISTRIBUTED:
 import torch.distributed as dist
@@ -40,16 +41,18 @@ except Exception as e:
     HASAPEX = False
     
 
-def setup(rank, world_size, backend, offset=0):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = str(12355+offset)
-
+def setup(backend="mpi"):
     # initialize the process group
-    dist.init_process_group(backend, rank=rank, world_size=world_size)
+    dist.init_process_group(backend=backend)
+    
+    # get rank and world_size
+    rank = dist.get_rank()
+    world_size = dist.get_world_size()
 
     # Explicitly setting seed to make sure that models created in two processes
     # start from same random weights and biases.
     torch.manual_seed(42)
+    return rank, world_size
 
 
 def cleanup():
@@ -123,8 +126,8 @@ def train(args, unet, imnet, train_loader, epoch, global_step, device,
                 logger.info(
                     "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss Sum: {:.6f}\t"
                     "Loss Reg: {:.6f}\tLoss Pde: {:.6f}".format(
-                        epoch, batch_idx * len(input_grid) * args.nprocs, 
-                        len(train_loader) * len(input_grid) * args.nprocs,
+                        epoch, batch_idx * len(input_grid) * args.world_size, 
+                        len(train_loader) * len(input_grid) * args.world_size,
                         100. * batch_idx / len(train_loader), loss.item(),
                         args.alpha_reg * reg_loss, args.alpha_pde * pde_loss))
                 # tensorboard log
@@ -224,11 +227,11 @@ def eval(args, unet, imnet, eval_loader, epoch, global_step, device,
 
 def get_args():
     # Training settings
-    parser = argparse.ArgumentParser(description="Segmentation")
+    parser = argparse.ArgumentParser(description="PDE Constrained Space Time Super-Resolution.")
     parser.add_argument("--batch_size_per_gpu", type=int, default=10, metavar="N",
                         help="input batch size for training (default: 10)")
-    parser.add_argument("--nprocs", type=int, default=2, metavar="N",
-                        help="number of parallel gpu processes (default: 2)")
+    parser.add_argument("--ranks_per_node", type=int, default=8, metavar="N",
+                        help="number of processes per node (default: 8)")
     parser.add_argument("--epochs", type=int, default=100, metavar="N",
                         help="number of epochs to train (default: 100)")
     parser.add_argument("--pseudo_epoch_size", type=int, default=3360, metavar="N",
@@ -293,19 +296,19 @@ def get_args():
                               "O1: Conservative Mixed Precision, O2: Fast Mixed Precision, O3: FP16 training."))
     parser.add_argument("--output_timing", default="", type=str, 
                         help="output time for this run to file. Useful for running scaling experiments.")
-    parser.add_argument("--comm_backend", default="gloo", type=str,
+    parser.add_argument("--dist_backend", default="nccl", type=str,
                         help="communication backend for distributed computing. choices: 'gloo', 'mpi', 'nccl'.")
+    parser.add_argument("--skip_eval", dest='skip_eval', action='store_true', help="skip evaluation during each epoch.")
+    parser.add_argument("--no_skip_eval", dest='skip_eval', action='store_false', help="no skip evaluation during each epoch.")
+    parser.set_defaults(skip_eval=False)
 
     args = parser.parse_args()
     return args
 
 
 def main_ddp(rank, world_size, args):
-    # do a constant offset of port address for each case to prevent port clashes on same node.
-    offset = int(args.apex_optim_level[1])*128+world_size
-    setup(rank, world_size, backend=args.comm_backend, offset=offset)
-
     args.rank = rank
+    args.world_size = world_size
     if args.use_apex and (not HASAPEX):
         if rank == 0:
             print(import_error)
@@ -315,10 +318,8 @@ def main_ddp(rank, world_size, args):
         args.use_apex = False
     DDP = ADDP if args.use_apex else TDDP
     
-#     n_per_rank = torch.cuda.device_count() // world_size
-#     device_ids = list(range(rank * n_per_rank, (rank + 1) * n_per_rank))
-    device_ids = [args.rank]
-    torch.cuda.set_device(args.rank)
+    device_ids = [int(args.rank % args.ranks_per_node)]
+    torch.cuda.set_device(int(args.rank % args.ranks_per_node))
 
     kwargs = {'num_workers': 1, 'pin_memory': True}
     device = torch.device(device_ids[0])
@@ -337,7 +338,7 @@ def main_ddp(rank, world_size, args):
     logger.info(f"[Rank] {rank:2d} [Cuda IDs] {device_ids}")
 
     # tensorboard writer
-    writer = SummaryWriter(log_dir=os.path.join(args.log_dir, 'tensorboard'))
+    writer = SummaryWriter(log_dir=os.path.join(args.log_dir, 'tensorboard-{}'.format(device_ids[0])))
 
     # random seed for reproducability
     torch.manual_seed((args.seed+1) * rank)
@@ -359,7 +360,7 @@ def main_ddp(rank, world_size, args):
         lres_filter=args.lres_filter, lres_interp=args.lres_interp
     )
 
-    nsamp_per_proc = args.pseudo_epoch_size // args.nprocs
+    nsamp_per_proc = args.pseudo_epoch_size // args.world_size
     train_sampler = RandomSampler(trainset, replacement=True, num_samples=nsamp_per_proc)
     eval_sampler = RandomSampler(evalset, replacement=True, num_samples=args.num_log_images)
 
@@ -443,8 +444,9 @@ def main_ddp(rank, world_size, args):
         loss = train(args, unet, imnet, train_loader, epoch, global_step, device, logger, writer,
                      optimizer, pde_layer)
         t1 = time.time()
-        eval(args, unet, imnet, eval_loader, epoch, global_step, device, logger, writer, 
-             optimizer, pde_layer)
+        if not args.skip_eval:
+            eval(args, unet, imnet, eval_loader, epoch, global_step, device, logger, writer, 
+                 optimizer, pde_layer)
         t2 = time.time()
         if args.lr_scheduler:
             scheduler.step(loss)
@@ -476,23 +478,16 @@ def main_ddp(rank, world_size, args):
                     if newfile:
                         fh.write("num_gpu,opt_level,total_time_per_epoch,train_time_per_epoch,eval_time_per_epoch\n")
                     fh.write(("{num_gpu},{opt_level},{tot_time},{train_time},{eval_time}\n"
-                              .format(num_gpu=args.nprocs, opt_level=args.apex_optim_level, 
+                              .format(num_gpu=args.world_size, opt_level=args.apex_optim_level, 
                                       tot_time=t3-t0, train_time=t1-t0, eval_time=t2-t1)))
         
     cleanup()
     
 def main():
     args = get_args()
-
-    ndevices = torch.cuda.device_count()
-    if args.nprocs > ndevices:
-        raise RuntimeError("Number of processes ({}) is greater than available GPU devices ({}). "
-                           "Rerun with --nprocs=N where N <= {}.".format(args.nprocs, ndevices, ndevices))    
-
-    mp.spawn(main_ddp,
-            args=(args.nprocs, args),
-            nprocs=args.nprocs,
-            join=True)
+    rank, world_size = init_workers(backend=args.dist_backend)
+    print("Initialized {} / {}".format(rank, world_size))
+    main_ddp(rank, world_size, args)
 
 if __name__ == "__main__":
     main()
