@@ -16,8 +16,8 @@ class RB2DataLoader(Dataset):
     """
     def __init__(self, data_dir="./", data_filename="./data/rb2d_ra1e6_s42.npz",
                  nx=128, nz=128, nt=16, n_samp_pts_per_crop=1024,
-                 downsamp_xz=4, downsamp_t=4, normalize_output=False, return_hres=False,
-                 lres_filter='none', lres_interp='linear'):
+                 downsamp_xz=4, downsamp_t=4, normalize_output=False, normalize_hres=False,
+                 return_hres=False, lres_filter='none', lres_interp='linear'):
         """
 
         Initialize DataSet
@@ -31,6 +31,7 @@ class RB2DataLoader(Dataset):
           downsamp_xz: int, downsampling factor for the spatial dimensions.
           downsamp_t: int, downsampling factor for the temporal dimension.
           normalize_output: bool, whether to normalize the range of each channel to [0, 1].
+          normalize_hres: bool, normalize high res grid.
           return_hres: bool, whether to return the high-resolution data.
           lres_filter: str, filter to apply on original high-res image before interpolation.
                        choice of 'none', 'gaussian', 'uniform', 'median', 'maximum'.
@@ -49,6 +50,7 @@ class RB2DataLoader(Dataset):
         self.downsamp_xz = downsamp_xz
         self.downsamp_t = downsamp_t
         self.normalize_output = normalize_output
+        self.normalize_hres = normalize_hres
         self.return_hres = return_hres
         self.lres_filter = lres_filter
         self.lres_interp = lres_interp
@@ -125,6 +127,7 @@ class RB2DataLoader(Dataset):
           space_time_crop_lres: array of shape [4, nt_lres, nz_lres, nx_lres], where 4 are the phys
           channels pbuw.
           point_coord: array of shape [n_samp_pts_per_crop, 3], where 3 are the t, x, z dims.
+                       CAUTION - point_coord are normalized to (0, 1) for the relative window.
           point_value: array of shape [n_samp_pts_per_crop, 4], where 4 are the phys channels pbuw.
         """
         t_id, z_id, x_id = self.rand_start_id[idx]
@@ -155,6 +158,8 @@ class RB2DataLoader(Dataset):
         if self.normalize_output:
             space_time_crop_lres = self.normalize_grid(space_time_crop_lres)
             point_value = self.normalize_points(point_value)
+        if self.normalize_hres:
+            space_time_crop_hres = self.normalize_grid(space_time_crop_hres)
 
         return_tensors = [space_time_crop_lres, point_coord, point_value]
 
