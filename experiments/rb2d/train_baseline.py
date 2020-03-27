@@ -202,17 +202,17 @@ def main():
 
     # create dataloaders
     trainset = loader.RB2DataLoader(
-        data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
+        data_dir=args.data_folder, data_filename=args.train_data,
         nx=args.nx, nz=args.nz, nt=args.nt, n_samp_pts_per_crop=1,
         downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
-        normalize_output=args.normalize_channels, normalize_hres=args.normalize_channels,
+        normalize_output=args.normalize_channels,
         return_hres=True, lres_filter=args.lres_filter, lres_interp=args.lres_interp
     )
     evalset = loader.RB2DataLoader(
-        data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
+        data_dir=args.data_folder, data_filename=args.eval_data,
         nx=args.nx, nz=args.nz, nt=args.nt, n_samp_pts_per_crop=1,
         downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
-        normalize_output=args.normalize_channels, normalize_hres=args.normalize_channels,
+        normalize_output=args.normalize_channels,
         return_hres=True, lres_filter=args.lres_filter, lres_interp=args.lres_interp
     )
 
