@@ -123,6 +123,10 @@ def get_args():
                         help="random seed (default: 1)")
     parser.add_argument("--data_folder", type=str, default="./data",
                         help="path to data folder (default: ./data)")
+    parser.add_argument("--train_data", type=str, default="rb2d_ra1e6_s42.npz",
+                        help="name of training data (default: rb2d_ra1e6_s42.npz)")
+    parser.add_argument("--eval_data", type=str, default="rb2d_ra1e6_s42.npz",
+                        help="name of training data (default: rb2d_ra1e6_s42.npz)")
     parser.add_argument("--log_interval", type=int, default=10, metavar="N",
                         help="how many batches to wait before logging training status")
     parser.add_argument("--log_dir", type=str, required=True, help="log directory for run")
