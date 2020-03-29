@@ -87,8 +87,11 @@ def export_video(args, res_dict, hres, lres, dataset):
     if dataset:
         # hres = dataset.denormalize_grid(hres.copy())
         lres = dataset.denormalize_grid(lres.copy())
-        pred = np.stack([res_dict[key] for key in phys_channels], axis=0)
-        pred = dataset.denormalize_grid(pred)
+        if args.baseline_no == 2:
+            pred = np.stack([res_dict[key] for key in phys_channels], axis=0)
+            pred = dataset.denormalize_grid(pred)
+        else:
+            pred = res_dict
         calculate_flow_stats(pred, hres)       # Warning: only works with pytorch > v1.3 and CUDA >= v10.1
         # np.savez_compressed(args.save_path+'highres_lowres_pred', hres=lres, lres=lres, pred=pred)
 
@@ -189,6 +192,7 @@ def get_args():
     parser.add_argument("--eval_tres", type=int, default=192, metavar="T",
                         help="t resolution during evaluation (default: 192)")
     parser.add_argument('--ckpt', type=str, required=True, help="path to checkpoint")
+    parser.add_argument('--baseline_no', type=int, required=True, help="baseline model number - choices (int): 1 or 2")
     parser.add_argument("--save_path", type=str, default='eval')
     parser.add_argument("--eval_dataset", type=str, required=True)
     parser.add_argument("--lres_interp", type=str, default='linear',
@@ -205,7 +209,22 @@ def get_args():
     args = parser.parse_args()
     return args
 
+def get_highres_pred_modelFree_trilinear_interp(lres_data):
+    
+    stats_all_lres = []
+    tl, zl, xl = np.linspace(0, 50, 48), np.linspace(0, 1, 16), np.linspace(0, 4, 64)
+    th, zh, xh = np.linspace(0, 50, 192), np.linspace(0, 1, 128), np.linspace(0, 4, 512)
+    highres_pred = []
+    for d in range(4): #["p", "b", "u", "w"]
+        grid_interp_func = RegularGridInterpolator((tl, zl, xl), lres_data[d, :, :, :])
+        query_points = [[i, j, k] for k in xh for j in zh for i in th]
+        highres_pred.append(np.reshape(grid_interp_func(query_points), [192, 128, 512]))
+    highres_pred = np.stack(highres_pred)
 
+    return highres_pred
+
+
+    
 def main():
     args = get_args()
     param_file = os.path.join(os.path.dirname(args.ckpt), "params.json")
@@ -225,8 +244,12 @@ def main():
 
     # get pdelayer for the RB2 equations
 
-    # evaluate model for getting high res spatial temporal sequence
-    res_dict = model_inference(args, lres)
+    if args.baseline_no == 2:
+        # evaluate model for getting high res spatial temporal sequence - Baseline II - Unet
+        res_dict = model_inference(args, lres)
+    else:
+        # get high res spatial temporal sequence using model-free trilinear grid interpolation - Baseline I
+        res_dict = get_highres_pred_modelFree_trilinear_interp(lres)
 
     # save video
     export_video(args, res_dict, hres, lres, dataset)
