@@ -250,12 +250,31 @@ class RB2DataLoader(Dataset):
         mean_bc = self.channel_mean[(None,)*(g_dim-1)]  # unsqueeze from the front
         std_bc = self.channel_std[(None,)*(g_dim-1)]  # unsqueeze from the front
         return self._denormalize_array(points, mean_bc, std_bc)
+    
+    
+class DistributedRandomSampler(Sampler):
+    def __init__(self, dataset, num_replicas=None, rank=None, num_samples=None):
+        self.data_source = dataset
+        self.num_replicas = num_replicas
+        self.rank = rank
+        self.num_samples = num_samples
+        self.data_per_proc = int(np.ceil(len(self.data_source) / num_replicas))
+        self.start_id = self.rank * self.data_per_proc
+        self.end_id = min(self.start_id + self.data_per_proc, len(self.data_source))
+        
+        if not isinstance(self.num_samples, int) or self.num_samples <= 0:
+            raise ValueError("num_samples should be a positive integer "
+                             "value, but got num_samples={}".format(self.num_samples))
 
+    def __iter__(self):
+        return iter(torch.randint(low=self.start_id, high=self.end_id, size=(self.num_samples,), dtype=torch.int64).tolist())
+
+    def __len__(self):
+        return self.num_samples
 
 if __name__ == '__main__':
     ### example for using the data loader
-    data_loader = RB2DataLoader(nt=16, n_samp_pts_per_crop=10000, downsamp_t=4, downsamp_xz=8,
-        return_hres=True)
+    data_loader = RB2DataLoader(nt=16, n_samp_pts_per_crop=10000, downsamp_t=4, downsamp_xz=8, return_hres=True)
     # lres_crop, point_coord, point_value = data_loader[61234]
     # import matplotlib.pyplot as plt
     # plt.scatter(point_coord[:, 1], point_coord[:, 2], c=point_value[:, 0])

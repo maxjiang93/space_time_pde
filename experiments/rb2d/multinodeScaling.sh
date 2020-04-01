@@ -1,7 +1,7 @@
 #!/bin/bash
 # perform parameter sweep for multinode scaling runs
 
-# num_gpus=(1 2 4 8 16 32)
+num_gpus=(1 2 4 8 16 32 64)
 opt_level=(O0)
 base_bs=14
 
@@ -13,8 +13,9 @@ module load esslurm
 # sweep
 for ngpu in ${num_gpus[@]}; do
   for opt in ${opt_level[@]}; do
+    echo $ngpu
     echo "Processing: $ngpu gpus, $opt optim..."
-    nnodes=$(python -c "from math import ceil; print(ceil($ngpu/8))")
+    nnodes=$(python -c "from math import ceil; print(int(ceil($ngpu/8.)))")
     ngpu_per_node=$(python -c "print(min($ngpu, 8))")
     olev=$(echo $opt | cut -c2-3)
     bs=$((($olev + 1)*$base_bs))

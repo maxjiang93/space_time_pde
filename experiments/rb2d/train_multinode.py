@@ -25,6 +25,7 @@ from unet3d import UNet3d
 from implicit_net import ImNet
 from local_implicit_grid import query_local_implicit_grid
 import dataloader_spacetime as loader
+# import dataloader_dummy as loader
 from physics import get_rb2_pde_layer
 from distributed import init_workers
 
@@ -41,27 +42,6 @@ except Exception as e:
     HASAPEX = False
     
 
-def setup(backend="mpi"):
-    # initialize the process group
-    dist.init_process_group(backend=backend)
-    
-    # get rank and world_size
-    rank = dist.get_rank()
-    world_size = dist.get_world_size()
-
-    # Explicitly setting seed to make sure that models created in two processes
-    # start from same random weights and biases.
-    torch.manual_seed(42)
-    return rank, world_size
-
-
-def cleanup():
-    dist.destroy_process_group()
-
-# pylint: disable=no-member
-
-
-
 def loss_functional(loss_type):
     """Get loss function given function type names."""
     if loss_type == 'l1':
@@ -73,7 +53,7 @@ def loss_functional(loss_type):
 
 
 def train(args, unet, imnet, train_loader, epoch, global_step, device,
-          logger, writer, optimizer, pde_layer):
+          logger, train_log_fh, writer, optimizer, pde_layer):
     """Training function."""
     unet.train()
     imnet.train()
@@ -140,6 +120,13 @@ def train(args, unet, imnet, train_loader, epoch, global_step, device,
                                    {"reg_loss": args.alpha_reg * reg_loss,
                                     "pde_loss": args.alpha_pde * pde_loss,
                                     "sum_loss": loss}, global_step=int(global_step))
+                # record training curve
+                ratio = float(batch_idx/len(train_loader))
+                train_log_fh.write('{global_step},{epoch},{nsamples},{wall_time},{loss}\n'.format(
+                    global_step=int(global_step), epoch=epoch-1+ratio,
+                    nsamples=int((epoch-1+ratio)*args.pseudo_epoch_size),
+                    wall_time=time.time()-args.t0,
+                    loss=loss.item()))
 
         global_step += 1
     tot_loss /= count
@@ -234,7 +221,7 @@ def get_args():
                         help="number of processes per node (default: 8)")
     parser.add_argument("--epochs", type=int, default=100, metavar="N",
                         help="number of epochs to train (default: 100)")
-    parser.add_argument("--pseudo_epoch_size", type=int, default=3360, metavar="N",
+    parser.add_argument("--pseudo_epoch_size", type=int, default=3584, metavar="N",
                         help="number of samples in an pseudo-epoch. (default: 3360)")
     parser.add_argument("--lr", type=float, default=1e-2, metavar="R",
                         help="learning rate (default: 0.01)")
@@ -280,6 +267,9 @@ def get_args():
     parser.add_argument("--lr_scheduler", dest='lr_scheduler', action='store_true')
     parser.add_argument("--no_lr_scheduler", dest='lr_scheduler', action='store_false')
     parser.set_defaults(lr_scheduler=True)
+    parser.add_argument("--lr_ramp", dest='lr_ramp', action='store_true')
+    parser.add_argument("--no_lr_ramp", dest='lr_ramp', action='store_false')
+    parser.set_defaults(lr_ramp=False)
     parser.add_argument("--use_apex", dest='use_apex', action='store_true')
     parser.add_argument("--no_use_apex", dest='use_apex', action='store_false')
     parser.set_defaults(use_apex=True)
@@ -331,18 +321,30 @@ def main_ddp(rank, world_size, args):
     filenames_to_snapshot = glob("*.py") + glob("*.sh")
     utils.snapshot_files(filenames_to_snapshot, args.log_dir)
     logger = utils.get_logger(log_dir=args.log_dir)
+    
+    # params file
     with open(os.path.join(args.log_dir, "params.json"), 'w') as fh:
         json.dump(args.__dict__, fh, indent=2)
     if args.rank == 0: logger.info("%s", repr(args))
+    
+    # training curve file
+    train_log_file = os.path.join(args.log_dir, 'train_curve.csv')
+    train_log_fh = open(train_log_file, 'w')
+    train_log_fh.write("global_step,epoch,nsamples,wall_time,loss\n")
         
     logger.info(f"[Rank] {rank:2d} [Cuda IDs] {device_ids}")
 
     # tensorboard writer
-    writer = SummaryWriter(log_dir=os.path.join(args.log_dir, 'tensorboard-{}'.format(device_ids[0])))
-
+    if args.rank == 0:
+        writer = SummaryWriter(log_dir=os.path.join(args.log_dir, 'tensorboard-{}'.format(device_ids[0])))
+    else:
+        writer = None
+        
     # random seed for reproducability
-    torch.manual_seed((args.seed+1) * rank)
-    np.random.seed((args.seed+1) * rank)
+#     torch.manual_seed((args.seed+1) * rank)
+#     np.random.seed((args.seed+1) * rank)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
     # create dataloaders
     trainset = loader.RB2DataLoader(
@@ -361,8 +363,10 @@ def main_ddp(rank, world_size, args):
     )
 
     nsamp_per_proc = args.pseudo_epoch_size // args.world_size
-    train_sampler = RandomSampler(trainset, replacement=True, num_samples=nsamp_per_proc)
-    eval_sampler = RandomSampler(evalset, replacement=True, num_samples=args.num_log_images)
+#     train_sampler = RandomSampler(trainset, replacement=True, num_samples=nsamp_per_proc)
+#     eval_sampler = RandomSampler(evalset, replacement=True, num_samples=args.num_log_images)
+    train_sampler = loader.DistributedRandomSampler(trainset, num_replicas=args.world_size, rank=args.rank, num_samples=nsamp_per_proc)
+    eval_sampler = loader.DistributedRandomSampler(evalset, num_replicas=args.world_size, rank=args.rank, num_samples=nsamp_per_proc)
 
     train_loader = DataLoader(trainset, batch_size=args.batch_size, shuffle=False, drop_last=True,
                               sampler=train_sampler, **kwargs)
@@ -373,6 +377,11 @@ def main_ddp(rank, world_size, args):
     unet = UNet3d(in_features=4, out_features=args.lat_dims, igres=trainset.scale_lres,
                   nf=args.unet_nf, mf=args.unet_mf)
     imnet = ImNet(dim=3, in_features=args.lat_dims, out_features=4, nf=args.imnet_nf)
+    
+    # use sync batch norm
+    if not args.use_apex:
+        unet = torch.nn.SyncBatchNorm.convert_sync_batchnorm(unet)
+        imnet = torch.nn.SyncBatchNorm.convert_sync_batchnorm(imnet)
     
     if args.resume:        
         # configure map_location properly
@@ -437,19 +446,35 @@ def main_ddp(rank, world_size, args):
 
     if args.lr_scheduler:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+    
+    if args.lr_ramp:
+        lr_sched_fn = lambda epoch: min((epoch+1)/5, 1)
+        sched_ramp = optim.lr_scheduler.LambdaLR(optimizer, lr_sched_fn, last_epoch=-1)
 
     # training loop
+    args.t0 = time.time()
     for epoch in range(start_ep + 1, args.epochs + 1):
         t0 = time.time()
-        loss = train(args, unet, imnet, train_loader, epoch, global_step, device, logger, writer,
+        loss = train(args, unet, imnet, train_loader, epoch, global_step, device, logger, train_log_fh, writer,
                      optimizer, pde_layer)
         t1 = time.time()
         if not args.skip_eval:
             eval(args, unet, imnet, eval_loader, epoch, global_step, device, logger, writer, 
                  optimizer, pde_layer)
         t2 = time.time()
+        
+        # add lr to tensorboard log
+        for param_group in optimizer.param_groups:
+            if args.rank == 0:
+                # tensorboard log
+                writer.add_scalar('lr', param_group['lr'], global_step=epoch)
         if args.lr_scheduler:
-            scheduler.step(loss)
+            if not args.lr_ramp:
+                scheduler.step(loss)
+            elif epoch > 5:
+                scheduler.step(loss)
+        if args.lr_ramp:
+            sched_ramp.step()
         if loss < tracked_stats:
             tracked_stats = loss
             is_best = True
@@ -469,7 +494,7 @@ def main_ddp(rank, world_size, args):
             logger.info(f"Total time per epoch: {datetime.timedelta(seconds=t3-t0)} ({t3-t0:.2f} secs)")
             logger.info(f"Train time per epoch: {datetime.timedelta(seconds=t1-t0)} ({t1-t0:.2f} secs)")
             logger.info(f"Eval  time per epoch: {datetime.timedelta(seconds=t2-t1)} ({t2-t1:.2f} secs)")
-            if epoch == 1 and args.output_timing:
+            if epoch == 2 and args.output_timing:
                 if not os.path.exists(args.output_timing):
                     newfile = True
                 else:
@@ -480,8 +505,7 @@ def main_ddp(rank, world_size, args):
                     fh.write(("{num_gpu},{opt_level},{tot_time},{train_time},{eval_time}\n"
                               .format(num_gpu=args.world_size, opt_level=args.apex_optim_level, 
                                       tot_time=t3-t0, train_time=t1-t0, eval_time=t2-t1)))
-        
-    cleanup()
+    train_log_fh.close()
     
 def main():
     args = get_args()
