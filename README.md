@@ -1,59 +1,18 @@
-# Physical Constrained Space Time Super-Resolution 
+# MeshfreeFlowNet
 
-[Progress Update Slides](https://docs.google.com/presentation/d/1YODV57luQjzG2T7SCabdBX0pEg6VO_T7K44V8-K6sIA/edit?usp=sharing) | [Methodolgy Slides](https://docs.google.com/presentation/d/13nI5D33ADybplJs5fFD3gM_txTEn0HiaP7gDBHhw6VM/edit#slide=id.g64a817040a_0_73) | [Writeup](https://www.overleaf.com/project/5deacb4f3a2f63000141b1ba) | [Project Folder](https://drive.google.com/open?id=1KybErSl2vU9vfiV_CSO_ApWsypGzezYs)
+By: [Chiyu "Max" Jiang*](http://maxjiang.ml/), [Soheil Esmaeilzadeh*](https://soheilesm.github.io/), [Kamyar Azizzadenesheli](https://www.cs.purdue.edu/homes/kamyar/), [Karthik Kashinath](http://www.nersc.gov/about/nersc-staff/data-analytics-services/karthik-kashinath/), [Mustafa Mustafa](https://www.nersc.gov/about/nersc-staff/data-analytics-services/mustafa-mustafa/), [Hamdi Tchelepi](https://profiles.stanford.edu/hamdi-tchelepi), [Philip Marcus](http://www.me.berkeley.edu/people/faculty/philip-s-marcus), [Prabhat](http://www.nersc.gov/about/nersc-staff/data-analytics-services/prabhat/), [Anima Anandkumar](http://tensorlab.cms.caltech.edu/users/anima/)
 
-This is the code repository for the physical constrained space time super-resolution project.
+\[[Project Website](http://www.maxjiang.ml/proj/meshfreeflownet)\] \[[Paper](to_appear)\] \[[Video](to_appear)\]
+ 
+![teaser](doc/meshfreeflownet_wide.png "meshfreeflownet_teaser")
 
-## Organization
-Here is a rough proposed organization of the code repo. Feel free to add additional folders / files to this list with a logical organization.
-```bash
-├── doc
-│   ├── pde_constraints.png
-│   └── pde_layer_schematic.png
-├── experiments
-│   └── rb2d
-│       ├── dataloader.py
-│       ├── model.py
-│       ├── README.md
-│       └── train.py
-├── README.md
-├── simulation
-│   └── 2d_rayleigh_benard
-│       ├── convert_to_npz.py
-│       ├── create_video.sh
-│       ├── plot_slices.py
-│       └── rayleigh_benard.py
-└── src
-    ├── implicit_net.py
-    ├── implicit_net_test.py
-    ├── local_implicit_grid_integration_test.py
-    ├── local_implicit_grid.py
-    ├── local_implicit_grid_test.py
-    ├── metrics.py
-    ├── pde.py
-    ├── pde_test.py
-    ├── README.md
-    ├── regular_nd_grid_interpolation.py
-    ├── regular_nd_grid_interpolation_test.py
-    ├── unet.py
-    └── utils.py
-```
+This is the code repository for the MeshfreeFlowNet: physical constrained space time super-resolution. Code implemented in PyTorch.
 
-## TODO
-- ~~Setup repo and write organization doc (@max)~~
-- ~~Add migrate LearnableVoxelGrid to lig and add temporal aspects into the framework (@max)~~
-- ~~Implement PDE constraints layer (@max)~~
-- ~~Convert data samples to `.npy` format before 12/10 and hand over to Soheil for testing (@max)~~
-- ~~Add detailed writeup and examples on how to use the PDE layers (@max)~~
-- ~~Create data loader (@soheil)~~
-- ~~Create U-Net (@soheil)~~
-- ~~Test dataloader + U-Net + lig on small data to overfit (@max)~~
-- ~~Create and debug training and evaluation script (@max)~~
-- ~~Add tensorboard to track training progress (@max)~~
-- ~~Create videos with evaluation (@max)~~
-- Create simulation data (similar b.c., different init. (initialization seeds)) (@soheil)
-- Rayleigh-Benard Training Cases (@soheil)
-    - Train on __one__ simulation and test on __same__ b.c. & a __different__ init. (Effect of init. (I)) 
-    - Train on __multiple__ simulations (__same__ b.c. & __different__ inits.). Test on __same__ b.c. & a __different__ init. (Effect of init. (II)). 
-    - Train on __different__ b.c. & __different__ inits. Test on a __different__ b.c. & a random init. (Effect of b.c. & init.). 
-- LaTeX writeup (@kamyar @soheil)
+## Introduction
+MeshfreeFlowNet is a novel deep learning-based super-resolution framework to generate continuous (grid-free) spatio-temporal solutions from the low-resolution inputs. While being computationally efficient, MeshfreeFlowNet accurately recovers the fine-scale quantities of interest. \alg allows for: (i) the output to be sampled at all spatio-temporal resolutions, (ii) a set of Partial Differential Equation (PDE) constraints to be imposed, and (iii) training on fixed-size inputs on arbitrarily sized spatio-temporal domains owing to its fully convolutional encoder.
+
+## Repo highlights
+Here are a few reasons why you might be interested in using our code:
+* We provide a general PyTorch-ready PDE layer that (i) allows evaluation of arbitrary combinations of partial differential equations (ii) provides a user-friendly interface that parses equations from human-readable string. (iii) computes gradient through any black-box function written using pytorch. Easy to plug-and-play into any physics informed ML projects. Find documentation and examples under [`src/`](src).
+* We provide general layers for 3D U-Nets, continuous decoding network (using IM-NET backbone), and the interpolation layer.
+* We provide scripts to reproduce the results in our paper.
