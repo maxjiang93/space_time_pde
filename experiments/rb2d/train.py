@@ -247,6 +247,10 @@ def get_args():
     parser.add_argument("--lres_interp", default='linear', type=str,
                         help=("type of interpolation scheme for generating low res input data."
                               "choice of 'linear', 'nearest'"))
+    parser.add_argument('--rayleigh', type=float, required=True,
+                        help='Simulation Rayleigh number.')
+    parser.add_argument('--prandtl', type=float, required=True,
+                        help='Simulation Prandtl number.')
 
     args = parser.parse_args()
     return args
@@ -347,7 +351,7 @@ def main():
     else:
         mean = std = None
     pde_layer = get_rb2_pde_layer(mean=mean, std=std,
-        t_crop=args.nt*0.125, z_crop=args.nz*(1./128), x_crop=args.nx*(1./128))
+        t_crop=args.nt*0.125, z_crop=args.nz*(1./128), x_crop=args.nx*(1./128), prandtl=args.prandtl, rayleigh=args.rayleigh)
 
     if args.lr_scheduler:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
