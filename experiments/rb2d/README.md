@@ -68,7 +68,7 @@ bash run_experiments.sh
 However, you should have created the corresponding datasets for each experiment from the simulation panel. Refer to the comments in the "run_experiments.sh" script as well.
 
 ## Evaluation
-To run evaluation for each experiment (and creates video) you can run
+To run evaluation for each experiment (and create videos) you can run
 ```bash
 python evaluation.py --eval_dataset='YOUR_EVAL_DATASET' --lres_filter='none' --ckpt='YOUR_CHECKPOINT_DIR/checkpoint_latest.pth.tar_pdenet_best.pth.tar' --save_path='YOUR_LOG_PATH_TO_SAVE_THE_EVAL_RESULTS/' --rayleigh="DATASET's CORRESPONDING RAYLEIGH" --prandtl="DATASET's CORRESPONDING PRANDTL"
 ```
