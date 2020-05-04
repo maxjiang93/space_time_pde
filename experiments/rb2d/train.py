@@ -50,6 +50,7 @@ def train(args, unet, imnet, train_loader, epoch, global_step, device,
     loss_func = loss_functional(args.reg_loss_type)
     for batch_idx, data_tensors in enumerate(train_loader):
         # send tensors to device
+        
         data_tensors = [t.to(device) for t in data_tensors]
         input_grid, point_coord, point_value = data_tensors
         optimizer.zero_grad()
@@ -79,7 +80,6 @@ def train(args, unet, imnet, train_loader, epoch, global_step, device,
         torch.nn.utils.clip_grad_value_(imnet.module.parameters(), args.clip_grad)
 
         optimizer.step()
-
         tot_loss += loss.item()
         count += input_grid.size()[0]
         if batch_idx % args.log_interval == 0:
@@ -199,6 +199,10 @@ def get_args():
                         help="random seed (default: 1)")
     parser.add_argument("--data_folder", type=str, default="./data",
                         help="path to data folder (default: ./data)")
+    parser.add_argument("--train_data", type=str, default="rb2d_ra1e6_s42.npz",
+                        help="name of training data (default: rb2d_ra1e6_s42.npz)")
+    parser.add_argument("--eval_data", type=str, default="rb2d_ra1e6_s42.npz",
+                        help="name of training data (default: rb2d_ra1e6_s42.npz)")
     parser.add_argument("--log_interval", type=int, default=10, metavar="N",
                         help="how many batches to wait before logging training status")
     parser.add_argument("--log_dir", type=str, required=True, help="log directory for run")
@@ -275,14 +279,14 @@ def main():
 
     # create dataloaders
     trainset = loader.RB2DataLoader(
-        data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
+        data_dir=args.data_folder, data_filename=args.train_data,
         nx=args.nx, nz=args.nz, nt=args.nt, n_samp_pts_per_crop=args.n_samp_pts_per_crop,
         downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
         normalize_output=args.normalize_channels, return_hres=False,
         lres_filter=args.lres_filter, lres_interp=args.lres_interp
     )
     evalset = loader.RB2DataLoader(
-        data_dir=args.data_folder, data_filename="rb2d_ra1e6_s42.npz",
+        data_dir=args.data_folder, data_filename=args.eval_data,
         nx=args.nx, nz=args.nz, nt=args.nt, n_samp_pts_per_crop=args.n_samp_pts_per_crop,
         downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
         normalize_output=args.normalize_channels, return_hres=True,
