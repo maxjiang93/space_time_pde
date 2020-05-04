@@ -61,6 +61,12 @@ python train -h
 ```
 The more important arguments are `--alpha_reg` and `--alpha_pde`, which controls the weights between regression loss and pde loss. Setting `--alpha_pde=0` would turn off pde loss during training process.
 
+In order to train the models for the results presented in the paper, you can run 
+```bash 
+bash run_experiments.sh
+```
+However, you should have created the corresponding datasets for each experiment from the simulation panel. Refer to the comments in the "run_experiments.sh" script as well.
+
 ## Evaluation
 To run evaluation (creates video):
 ```bash
