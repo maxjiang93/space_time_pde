@@ -114,16 +114,16 @@ def export_video(args, res_dict, hres, lres, dataset):
             lid = int(np.round(pid / (pred_frames.shape[0] - 1) * (lres_frames.shape[0] - 1)))
 
             fig, axes = plt.subplots(3, figsize=(10, 10))#, 1, sharex=True)
-            # hi res ground truth
-            im0 = axes[0].imshow(hres_frames[hid], interpolation='nearest')
+            # high res ground truth
+            im0 = axes[0].imshow(hres_frames[hid], cmap='RdBu',interpolation='spline16')
             axes[0].set_title(f'{name} channel, high res ground truth.')
             im0.set_clim(min_val, max_val)
-            # lo res input
-            im1 = axes[1].imshow(lres_frames[lid], interpolation='nearest')
+            # low res input
+            im1 = axes[1].imshow(lres_frames[lid], cmap='RdBu',interpolation='none')
             axes[1].set_title(f'{name} channel, low  res ground truth.')
             im1.set_clim(min_val, max_val)
             # prediction
-            im2 = axes[2].imshow(pred_frames[pid], interpolation='nearest')
+            im2 = axes[2].imshow(pred_frames[pid], cmap='RdBu',interpolation='spline16')
             axes[2].set_title(f'{name} channel, predicted values.')
             im2.set_clim(min_val, max_val)
             # add shared colorbar

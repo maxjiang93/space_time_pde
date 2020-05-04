@@ -164,11 +164,11 @@ def export_video(args, res_dict, hres, lres, dataset):
             lid = int(np.round(pid / (pred_frames.shape[0] - 1) * (lres_frames.shape[0] - 1)))
 
             fig, axes = plt.subplots(3, figsize=(10, 10))#, 1, sharex=True)
-            # hi res ground truth
+            # high res ground truth
             im0 = axes[0].imshow(hres_frames[hid], cmap='RdBu',interpolation='spline16')
             axes[0].set_title(f'{name} channel, high res ground truth.')
             im0.set_clim(min_val, max_val)
-            # lo res input
+            # low res input
             im1 = axes[1].imshow(lres_frames[lid], cmap='RdBu',interpolation='none')
             axes[1].set_title(f'{name} channel, low  res ground truth.')
             im1.set_clim(min_val, max_val)
