@@ -259,8 +259,7 @@ class RB2DataLoader(Dataset):
 
 if __name__ == '__main__':
     ### example for using the data loader
-    data_loader = RB2DataLoader(nt=16, n_samp_pts_per_crop=10000, downsamp_t=4, downsamp_xz=8,
-        return_hres=True)
+    data_loader = RB2DataLoader(nt=16, n_samp_pts_per_crop=10000, downsamp_t=4, downsamp_xz=8, return_hres=True)
     # lres_crop, point_coord, point_value = data_loader[61234]
     # import matplotlib.pyplot as plt
     # plt.scatter(point_coord[:, 1], point_coord[:, 2], c=point_value[:, 0])
@@ -269,8 +268,7 @@ if __name__ == '__main__':
     # plt.imshow(lres_crop[0, :, :, 0].T, origin='lower'); plt.show()
     # plt.imshow(lres_crop[1, :, :, 0].T, origin='lower'); plt.show()
 
-    data_batches = torch.utils.data.DataLoader(
-        data_loader, batch_size=16, shuffle=True, num_workers=1)
+    data_batches = torch.utils.data.DataLoader(data_loader, batch_size=16, shuffle=True, num_workers=1)
 
     for batch_idx, (hires_input_batch, lowres_input_batch, point_coords, point_values) in enumerate(data_batches):
         print("Reading batch #{}:\t with lowres inputs of size {}, sample coord of size {}, sampe val of size {}"
