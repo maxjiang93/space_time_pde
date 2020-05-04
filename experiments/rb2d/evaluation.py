@@ -165,15 +165,15 @@ def export_video(args, res_dict, hres, lres, dataset):
 
             fig, axes = plt.subplots(3, figsize=(10, 10))#, 1, sharex=True)
             # hi res ground truth
-            im0 = axes[0].imshow(hres_frames[hid], interpolation='nearest')
+            im0 = axes[0].imshow(hres_frames[hid], cmap='RdBu',interpolation='spline16')
             axes[0].set_title(f'{name} channel, high res ground truth.')
             im0.set_clim(min_val, max_val)
             # lo res input
-            im1 = axes[1].imshow(lres_frames[lid], interpolation='nearest')
+            im1 = axes[1].imshow(lres_frames[lid], cmap='RdBu',interpolation='none')
             axes[1].set_title(f'{name} channel, low  res ground truth.')
             im1.set_clim(min_val, max_val)
             # prediction
-            im2 = axes[2].imshow(pred_frames[pid], interpolation='nearest')
+            im2 = axes[2].imshow(pred_frames[pid], cmap='RdBu',interpolation='spline16')
             axes[2].set_title(f'{name} channel, predicted values.')
             im2.set_clim(min_val, max_val)
             # add shared colorbar
@@ -259,7 +259,7 @@ def get_args():
     parser.add_argument("--eval_dataset", type=str, required=True)
     parser.add_argument("--lres_interp", type=str, default='linear',
                         help="str, interpolation scheme for generating low res. choices of 'linear', 'nearest'")
-    parser.add_argument("--lres_filter", type=str, default='gaussian',
+    parser.add_argument("--lres_filter", type=str, default='none',
                         help=" str, filter to apply on original high-res image before \
                         interpolation. choices of 'none', 'gaussian', 'uniform', 'median', 'maximum'")
     parser.add_argument("--frame_rate", type=int, default=10, metavar="N",
@@ -269,6 +269,10 @@ def get_args():
     parser.add_argument("--eval_pseudo_batch_size", type=int, default=10000,
                         help="psudo batch size for querying the grid. set to a smaller"
                              " value if OOM error occurs")
+    parser.add_argument('--rayleigh', type=float, required=True,
+                        help='Simulation Rayleigh number.')
+    parser.add_argument('--prandtl', type=float, required=True,
+                        help='Simulation Prandtl number.')
     parser.set_defaults(keep_frames=False)
     args = parser.parse_args()
     return args
@@ -297,7 +301,8 @@ def main():
         std = dataset.channel_std
     else:
         mean = std = None
-    pde_layer = get_rb2_pde_layer(mean=mean, std=std)
+    pde_layer = get_rb2_pde_layer(mean=mean, std=std, prandtl=args.prandtl, rayleigh=args.rayleigh)
+    # pde_layer = get_rb2_pde_layer(mean=mean, std=std)
 
     # evaluate model for getting high res spatial temporal sequence
     res_dict = model_inference(args, lres, pde_layer)
