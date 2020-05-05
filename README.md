@@ -18,6 +18,8 @@ Here are a few reasons why you might be interested in using our code:
 * We provide scripts to reproduce the results in our paper.
 
 
+---
+
 ### In case of using the code or finding the paper impactful in your research please consider citing:
 
     @article{Jiang2020,
