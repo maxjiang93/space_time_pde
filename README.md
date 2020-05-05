@@ -28,7 +28,6 @@ Here are a few reasons why you might be interested in using our code:
     author = {Jiang, Chiyu Max and Esmaeilzadeh, Soheil and Azizzadenesheli, Kamyar and Kashinath, 
     Karthik and Mustafa, Mustafa and Tchelepi, Hamdi A. and Marcus, Philip and Prabhat and Anandkumar, Anima},
     eprint = {2005.01463},
-    file = {:Users/soheil/2005.01463.pdf:pdf},
     title = {{MeshfreeFlowNet: A Physics-Constrained Deep Continuous Space-Time Super-Resolution Framework}},
     url = {http://arxiv.org/abs/2005.01463},
     year = {2020}
