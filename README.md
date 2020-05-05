@@ -16,3 +16,18 @@ Here are a few reasons why you might be interested in using our code:
 * We provide a general PyTorch-ready PDE layer that (i) allows evaluation of arbitrary combinations of partial differential equations (ii) provides a user-friendly interface that parses equations from human-readable string. (iii) computes gradient through any black-box function written using pytorch. Easy to plug-and-play into any physics informed ML projects. Find documentation and examples under [`src/`](src).
 * We provide general layers for 3D U-Nets, continuous decoding network (using IM-NET backbone), and the interpolation layer.
 * We provide scripts to reproduce the results in our paper.
+
+
+In case of using the code or finding the paper impactful in your research please consider citing:
+
+    @article{Jiang2020,
+    archivePrefix = {arXiv},
+    arxivId = {2005.01463},
+    author = {Jiang, Chiyu Max and Esmaeilzadeh, Soheil and Azizzadenesheli, Kamyar and Kashinath, Karthik and Mustafa, Mustafa and Tchelepi, Hamdi A. and Marcus, Philip and Prabhat and Anandkumar, Anima},
+    eprint = {2005.01463},
+    file = {:Users/soheil/2005.01463.pdf:pdf},
+    title = {{MeshfreeFlowNet: A Physics-Constrained Deep Continuous Space-Time Super-Resolution Framework}},
+    url = {http://arxiv.org/abs/2005.01463},
+    year = {2020}
+    }
+
