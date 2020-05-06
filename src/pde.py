@@ -130,7 +130,8 @@ class PDELayer(object):
             # split into individual channels and set each to require grad.
             inputs = [x[..., i:i+1] for i in range(x.shape[-1])]
             for xx in inputs:
-              xx.requires_grad = True
+                if not xx.requires_grad:
+                    xx.requires_grad = True
             x_ = torch.cat(inputs, axis=-1)
             y = self.eval(x_)
             outputs = [y[..., i:i+1] for i in range(y.shape[-1])]

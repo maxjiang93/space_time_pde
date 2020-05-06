@@ -24,6 +24,7 @@ def generate_test_data_heat_eqn():
 
     # input tensor
     inpt = torch.tensor([[1., 2., 3.]])
+    
     x, y, t = inpt[..., 0:1], inpt[..., 1:2], inpt[..., 2:3]
     g = x + 3*y**2 - 2 - 6*t
     expected_grads = {eqn_names[0]: g, eqn_names[1]: g}
