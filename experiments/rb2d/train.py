@@ -22,6 +22,7 @@ import train_utils as utils
 from unet3d import UNet3d
 from implicit_net import ImNet
 from local_implicit_grid import query_local_implicit_grid
+from nonlinearities import NONLINEARITIES
 import dataloader_spacetime as loader
 from physics import get_rb2_pde_layer
 
@@ -251,6 +252,8 @@ def get_args():
                         help='Simulation Rayleigh number.')
     parser.add_argument('--prandtl', type=float, required=True,
                         help='Simulation Prandtl number.')
+    parser.add_argument('--nonlin', type=str, default='leakyrelu', choices=list(NONLINEARITIES.keys()),
+                        help='Nonlinear activations for continuous decoder.')
 
     args = parser.parse_args()
     return args
@@ -308,7 +311,8 @@ def main():
     # setup model
     unet = UNet3d(in_features=4, out_features=args.lat_dims, igres=trainset.scale_lres,
                   nf=args.unet_nf, mf=args.unet_mf)
-    imnet = ImNet(dim=3, in_features=args.lat_dims, out_features=4, nf=args.imnet_nf)
+    imnet = ImNet(dim=3, in_features=args.lat_dims, out_features=4, nf=args.imnet_nf, 
+                  activation=NONLINEARITIES[args.nonlin])
     all_model_params = list(unet.parameters())+list(imnet.parameters())
 
     if args.optim == "sgd":
