@@ -66,3 +66,11 @@ To run evaluation (creates video):
 ```bash
 python evaluation.py --ckpt='/path/to/checkpoint.pth.tar'
 ```
+
+# Scaling Experiments on Cori
+To launch a scaled (Distributed Data Parallel) version of the training script on Cori, (modify and) submit the script `submit_job_g128_O0.sh`.
+```bash
+module load esslurm
+sbatch submit_job_g128_O0.sh
+```
+Timing for training for one epoch is saved as a new entry in the file `scaling/scaling_multinode.csv`. The convergence curve for each run can be pulled out from `log/<run_name>/train_curve.csv`. The jupyter notebook `scaling_plots.ipynb` can be used to plot such curves.
