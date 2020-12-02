@@ -290,7 +290,7 @@ def main():
     # prepare dataset
     dataset = loader.RB2DataLoader(
         data_dir=args.data_folder, data_filename=args.eval_dataset,
-        nx=512, nz=128, nt=192, n_samp_pts_per_crop=1,
+        nx=args.eval_xres, nz=args.eval_zres, nt=args.eval_tres, n_samp_pts_per_crop=1,
         lres_interp=args.lres_interp, lres_filter=args.lres_filter, downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
         normalize_output=args.normalize_channels, return_hres=True)
 
