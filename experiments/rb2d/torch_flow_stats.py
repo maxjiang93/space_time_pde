@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 import time
-from torchsearchsorted import searchsorted
 from torch_spec_operator import img, rfftfreqs, fftfreqs, spec_grad, pad_rfft3, pad_irfft3
 
 
@@ -32,7 +31,7 @@ def energy_spectrum(vel):
     bins[-1] = k_bin[-1]
     bins = bins.unsqueeze(0)
     bins[1:] += 1e-3
-    inds = searchsorted(bins, rad.flatten().unsqueeze(0)).squeeze().int()
+    inds = torch.searchsorted(bins, rad.flatten().unsqueeze(0)).squeeze().int()
     # bincount = torch.histc(inds.cpu(), bins=bins.shape[1]+1).to(device)
     bincount = torch.bincount(inds)
     asort = torch.argsort(inds.squeeze())

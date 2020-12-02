@@ -184,6 +184,16 @@ def eval(args, unet, imnet, eval_loader, epoch, global_step, device,
 
 
 def get_args():
+    def str2bool(v):
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
+
     # Training settings
     parser = argparse.ArgumentParser(description="Segmentation")
     parser.add_argument("--batch_size_per_gpu", type=int, default=10, metavar="N",
@@ -253,6 +263,8 @@ def get_args():
     parser.add_argument('--prandtl', type=float, required=True,
                         help='Simulation Prandtl number.')
     parser.add_argument('--nonlin', type=str, default='leakyrelu', choices=list(NONLINEARITIES.keys()),
+                        help='Nonlinear activations for continuous decoder.')
+    parser.add_argument('--use_continuity', type=str2bool, nargs='?', default=False, const=True,
                         help='Nonlinear activations for continuous decoder.')
 
     args = parser.parse_args()
@@ -355,7 +367,8 @@ def main():
     else:
         mean = std = None
     pde_layer = get_rb2_pde_layer(mean=mean, std=std,
-        t_crop=args.nt*0.125, z_crop=args.nz*(1./128), x_crop=args.nx*(1./128), prandtl=args.prandtl, rayleigh=args.rayleigh)
+        t_crop=args.nt*0.125, z_crop=args.nz*(1./128), x_crop=args.nx*(1./128), prandtl=args.prandtl, rayleigh=args.rayleigh,
+        use_continuity=args.use_continuity)
 
     if args.lr_scheduler:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
