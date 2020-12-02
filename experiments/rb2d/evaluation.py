@@ -96,7 +96,7 @@ def frames_to_video(frames_pattern, save_video_to, frame_rate=10, keep_frames=Fa
 
 def calculate_flow_stats(pred, hres, visc=0.0001):
     data = pred
-    uw = np.transpose(data[2:4,:,:,1:1+128], (1, 0, 2, 3))
+    uw = np.transpose(data[2:4,:,:,1:1+args.eval_zres], (1, 0, 2, 3))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     uw = torch.tensor(uw, device=device).float()
     stats = compute_all_stats(uw[2:,:,:,:], viscosity=visc, description=False)
@@ -116,7 +116,7 @@ def calculate_flow_stats(pred, hres, visc=0.0001):
     file.write("Large eddy turnover time : {}\n\n\n\n\n".format(s[8]))
 
     data = hres
-    uw = np.transpose(data[2:4,:,:,1:1+128], (1, 0, 2, 3))
+    uw = np.transpose(data[2:4,:,:,1:1+args.eval_zres], (1, 0, 2, 3))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     uw = torch.tensor(uw, device=device).float()
     stats = compute_all_stats(uw[2:,:,:,:], viscosity=visc, description=False)
@@ -221,7 +221,7 @@ def model_inference(args, lres, pde_layer):
     latent_grid = latent_grid.permute(0, 2, 3, 4, 1)  # [batch, T, Z, X, C]
 
     # create evaluation grid
-    t_max = float(192/args.nt)
+    t_max = float(args.eval_tres/args.nt)
     z_max = 1
     x_max = 4
 
