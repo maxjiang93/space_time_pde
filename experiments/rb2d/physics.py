@@ -31,7 +31,7 @@ def get_rb2_pde_layer(mean=None, std=None, t_crop=2., z_crop=1., x_crop=2., pran
     eqn_names = ['transport_eqn_b', 'transport_eqn_u', 'transport_eqn_w']
 
     if use_continuity:
-        eqn_strs.append(f'{nx} * dif(u, x) - {nz} * dif(w, z)')
+        eqn_strs.append(f'{nx} * dif(u, x) + {nz} * dif(w, z)')
         eqn_names.append('continuity')
 
     # normalize equations (optional) via change of variables.
