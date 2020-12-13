@@ -256,6 +256,10 @@ def get_args():
                         help="z resolution during evaluation (default: 128)")
     parser.add_argument("--eval_tres", type=int, default=192, metavar="T",
                         help="t resolution during evaluation (default: 192)")
+    parser.add_argument("--eval_downsamp_t", default=4, type=int,
+                        help="down sampling factor in t for low resolution crop.")
+    parser.add_argument("--eval_downsamp_xz", default=4, type=int,
+                        help="down sampling factor in x and z for low resolution crop.")
     parser.add_argument('--ckpt', type=str, required=True, help="path to checkpoint")
     parser.add_argument("--save_path", type=str, default='eval')
     parser.add_argument("--eval_dataset", type=str, required=True)
@@ -291,7 +295,7 @@ def main():
     dataset = loader.RB2DataLoader(
         data_dir=args.data_folder, data_filename=args.eval_dataset,
         nx=args.eval_xres, nz=args.eval_zres, nt=args.eval_tres, n_samp_pts_per_crop=1,
-        lres_interp=args.lres_interp, lres_filter=args.lres_filter, downsamp_xz=args.downsamp_xz, downsamp_t=args.downsamp_t,
+        lres_interp=args.lres_interp, lres_filter=args.lres_filter, downsamp_xz=args.eval_downsamp_xz, downsamp_t=args.eval_downsamp_t,
         normalize_output=args.normalize_channels, return_hres=True)
 
     # extract data
