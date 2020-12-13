@@ -256,9 +256,9 @@ def get_args():
                         help="z resolution during evaluation (default: 128)")
     parser.add_argument("--eval_tres", type=int, default=192, metavar="T",
                         help="t resolution during evaluation (default: 192)")
-    parser.add_argument("--eval_downsamp_t", default=4, type=int,
+    parser.add_argument("--eval_downsamp_t", default=4, type=int, required=True, 
                         help="down sampling factor in t for low resolution crop.")
-    parser.add_argument("--eval_downsamp_xz", default=4, type=int,
+    parser.add_argument("--eval_downsamp_xz", default=4, type=int, required=True,
                         help="down sampling factor in x and z for low resolution crop.")
     parser.add_argument('--ckpt', type=str, required=True, help="path to checkpoint")
     parser.add_argument("--save_path", type=str, default='eval')
