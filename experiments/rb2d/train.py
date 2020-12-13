@@ -222,11 +222,11 @@ def get_args():
                         help="path to checkpoint if resume is needed")
     parser.add_argument("--nt", default=16, type=int, help="resolution of high res crop in t.")
     parser.add_argument("--nx", default=128, type=int, help="resolution of high res crop in x.")
-    parser.add_argument("--nz", default=128, type=int, help="resolution of high res crop in y.")
+    parser.add_argument("--nz", default=128, type=int, help="resolution of high res crop in z.")
     parser.add_argument("--downsamp_t", default=4, type=int,
                         help="down sampling factor in t for low resolution crop.")
     parser.add_argument("--downsamp_xz", default=8, type=int,
-                        help="down sampling factor in x and y for low resolution crop.")
+                        help="down sampling factor in x and z for low resolution crop.")
     parser.add_argument("--n_samp_pts_per_crop", default=1024, type=int,
                         help="number of sample points to draw per crop.")
     parser.add_argument("--lat_dims", default=32, type=int, help="number of latent dimensions.")
