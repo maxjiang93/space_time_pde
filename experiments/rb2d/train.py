@@ -265,7 +265,7 @@ def get_args():
     parser.add_argument('--nonlin', type=str, default='leakyrelu', choices=list(NONLINEARITIES.keys()),
                         help='Nonlinear activations for continuous decoder.')
     parser.add_argument('--use_continuity', type=str2bool, nargs='?', default=False, const=True,
-                        help='Nonlinear activations for continuous decoder.')
+                        help='Whether to enforce continuity equation (mass conservation) or not')
 
     args = parser.parse_args()
     return args
