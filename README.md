@@ -3,6 +3,8 @@
 
 By: [Chiyu "Max" Jiang*](http://maxjiang.ml/), [Soheil Esmaeilzadeh*](https://soheilesm.github.io/), [Kamyar Azizzadenesheli](https://www.cs.purdue.edu/homes/kamyar/), [Karthik Kashinath](http://www.nersc.gov/about/nersc-staff/data-analytics-services/karthik-kashinath/), [Mustafa Mustafa](https://www.nersc.gov/about/nersc-staff/data-analytics-services/mustafa-mustafa/), [Hamdi Tchelepi](https://profiles.stanford.edu/hamdi-tchelepi), [Philip Marcus](http://www.me.berkeley.edu/people/faculty/philip-s-marcus), [Prabhat](http://www.nersc.gov/about/nersc-staff/data-analytics-services/prabhat/), [Anima Anandkumar](http://tensorlab.cms.caltech.edu/users/anima/) (* Denotes Equal Contributions)
 
+Published at International Conference for High Performance Computing, Networking, Storage and Analysis (SC20). Best Student Paper Award Finalist.
+
 \[[Project Website](http://www.maxjiang.ml/proj/meshfreeflownet)\] \[[Paper](https://arxiv.org/pdf/2005.01463.pdf)\] \[[Video](https://youtu.be/mjqwPch9gDo)\] \[[Addtional Video - APS DFD 2020 Presentation](https://www.youtube.com/watch?v=anZ_gLrvnYs&t=538s&ab_channel=SoheilEsmaeilzadeh)\]
  
 ![teaser](doc/meshfreeflownet_wide.png "meshfreeflownet_teaser")
